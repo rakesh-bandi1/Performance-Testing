@@ -90,7 +90,7 @@ class BrowserManager {
 
   async launch() {
     this.browser = await puppeteer.launch({
-      headless: false,
+      headless: true,
     });
     this.page = await this.browser.newPage();
     await this.page.setViewport(CONFIG.viewport);
