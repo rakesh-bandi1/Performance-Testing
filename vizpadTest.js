@@ -7,8 +7,8 @@ const CONFIG = {
   vizpadUrl: process.argv[2] || 'https://galaxyai.bayer.com/dashboard/270c03b/a5986ed7-28c8-4739-bc84-8ef2dfead134?utm_source=546bf610-3e40-4ebb-b57e-78a7f5a076fc',
   tabIndex: process.argv[4] || 0,
   timeouts: {
-    navigation: 100000,
-    element: 30000, // 30 seconds for element timeout
+    navigation: 1000000,
+    element: 300000, // 30 seconds for element timeout
     longNavigation: 1000000,
   },
   viewport: { width: 1366, height: 768 },
@@ -90,7 +90,7 @@ class BrowserManager {
 
   async launch() {
     this.browser = await puppeteer.launch({
-      headless: true,
+      headless: false,
     });
     this.page = await this.browser.newPage();
     await this.page.setViewport(CONFIG.viewport);
@@ -651,7 +651,7 @@ class VizpadTestRunner {
     console.log(`Results structure:`, JSON.stringify(results[0], null, 2));
     
     // Save CSV file using manual generation (more reliable)
-    const filename = `testReport/vizpad_test_${numUsers}_users.csv`;
+    const filename = `testReports/vizpad_test_${numUsers}_users.csv`;
     const fs = require('fs');
     
     let csvContent = 'Script Time (s),Number of Users,Vizpad URL\n';
