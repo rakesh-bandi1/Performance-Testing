@@ -8,11 +8,14 @@
       "test:users": "node test_optimized.js",
       "test:direct": "node test_optimized.js",
       "vizpad": "node run_vizpad_test.js",
-      "vizpad:direct": "node vizpadTest.js"
+      "vizpad:direct": "node vizpadTest.js",
+      "email:test": "node testEmail.js",
+      "email:setup": "echo 'Please configure email settings in emailConfig.js or set environment variables'"
     },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "nodemailer": "^6.9.7",
     "objects-to-csv": "^1.3.6",
     "puppeteer": "^24.14.0",
     "puppeteer-core": "^24.14.0"

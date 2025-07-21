@@ -25,7 +25,7 @@ async function runInteractiveVizpadTest() {
     
     // 2. Ask for number of users
     // const numUsers = await askQuestion('How many users do you want to test? (default: 1): ');
-    const numUsers = '10';
+    const numUsers = '1';
     const users = numUsers.trim() === '' ? '1' : numUsers.trim();
     
     // 3. Ask for tab index
@@ -33,16 +33,22 @@ async function runInteractiveVizpadTest() {
     const tabIndex = '0';
     const tab = tabIndex.trim() === '' ? '0' : tabIndex.trim();
     
+    // 4. Ask for email configuration
+    // const enableEmail = await askQuestion('Send results via email? (y/n, default: n): ');
+    const enableEmail = 'y';
+    const emailEnabled = enableEmail.trim().toLowerCase() === 'y' || enableEmail.trim().toLowerCase() === 'yes';
+    
     console.log(`\nRunning vizpad test with:`);
     console.log(`- Vizpad URL: ${url}`);
     console.log(`- Users: ${users}`);
-    console.log(`- Tab Index: ${tab}\n`);
+    console.log(`- Tab Index: ${tab}`);
+    console.log(`- Email enabled: ${emailEnabled ? 'Yes' : 'No'}\n`);
     
     // Close readline interface
     rl.close();
     
     // Run the vizpad test script with the provided parameters
-    const testProcess = spawn('node', ['vizpadTest.js', url, users, tab], {
+    const testProcess = spawn('node', ['vizpadTest.js', url, users, tab, emailEnabled.toString()], {
       stdio: 'inherit'
     });
     

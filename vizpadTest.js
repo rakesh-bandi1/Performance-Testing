@@ -1,11 +1,13 @@
 const ObjectsToCsv = require('objects-to-csv');
 const puppeteer = require('puppeteer');
 const { getRandomData } = require('./helper.js');
+const EmailService = require('./emailService.js');
 
 // Configuration
 const CONFIG = {
   vizpadUrl: process.argv[2] || 'https://galaxyai.bayer.com/dashboard/270c03b/a5986ed7-28c8-4739-bc84-8ef2dfead134?utm_source=546bf610-3e40-4ebb-b57e-78a7f5a076fc',
   tabIndex: process.argv[4] || 0,
+  enableEmail: process.argv[5] === 'true' || process.env.ENABLE_EMAIL === 'true',
   timeouts: {
     navigation: 1000000,
     element: 300000, // 30 seconds for element timeout
@@ -757,6 +759,19 @@ class VizpadTestRunner {
       this.metrics.errors.forEach(error => {
         console.log(`User ${error.userId}: ${error.error} (${error.context})`);
       });
+    }
+
+    // Send email if enabled
+    if (CONFIG.enableEmail) {
+      try {
+        console.log('\n📧 Sending email report...');
+        const emailService = new EmailService();
+        await emailService.sendTestResults(results, numUsers, scriptRunTime, CONFIG.vizpadUrl, filename);
+        console.log('✅ Email report sent successfully!');
+      } catch (error) {
+        console.error('❌ Failed to send email report:', error.message);
+        console.log('Continuing without email...');
+      }
     }
   }
 }
