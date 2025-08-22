@@ -6,8 +6,9 @@ const EmailService = require('./emailService.js');
 // Configuration
 const CONFIG = {
   vizpadUrl: process.argv[2] || 'https://galaxyai.bayer.com/dashboard/270c03b/a5986ed7-28c8-4739-bc84-8ef2dfead134?utm_source=546bf610-3e40-4ebb-b57e-78a7f5a076fc',
-  tabIndex: process.argv[4] || 0,
+  tabSwitch: process.argv[4] || 'false',
   enableEmail: process.argv[5] === 'true' || process.env.ENABLE_EMAIL === 'true',
+  tabIndex: 0,
   timeouts: {
     navigation: 1000000,
     element: 300000, // 30 seconds for element timeout
@@ -215,8 +216,8 @@ class VizpadTestRunner {
       vizpadLoadTime: 0,
       chartLoadTime: 0,
       areaFilterTime: 0,
+      regionFilterTime: 0,
       territoryFilterTime: 0,
-      timeFilterTime: 0,
       TotalFilterTestTime: 0,
       success: true,
     };
@@ -233,9 +234,10 @@ class VizpadTestRunner {
       console.log(`User ${userId}: CONFIG.tabIndex = "${CONFIG.tabIndex}" (type: ${typeof CONFIG.tabIndex})`);
       
       // Check if tab index is valid and greater than 0
-      const tabIndexNum = parseInt(CONFIG.tabIndex);
-      if (CONFIG.tabIndex && CONFIG.tabIndex !== '' && CONFIG.tabIndex !== 'null' && CONFIG.tabIndex !== 'undefined' && !isNaN(tabIndexNum) && tabIndexNum > 0) {
-        console.log(`User ${userId}: Tab index is valid and > 0, performing tab switch`);
+      if (CONFIG.tabSwitch === 'true') {
+        let tabIndex = Math.floor(Math.random() * 10);
+        console.log(`User ${userId}: Tab index is ${tabIndex}`);
+        CONFIG.tabIndex = tabIndex;
         await this.switchTab(userId, testResults, browserManager);
       } 
       await this.performFilterTest(userId, testResults, browserManager);
@@ -275,7 +277,7 @@ class VizpadTestRunner {
         // Wait for any loading text to appear (with short timeout)
         for (const loadingText of loadingTexts) {
           try {
-            await browserManager.waitForText(loadingText, 10000); // 10 second timeout
+            await browserManager.waitForText(loadingText, 5000); // 5 second timeout
             console.log(`Loading text appeared: "${loadingText}"`);
             loadingTextFound = true;
             break;
@@ -374,7 +376,7 @@ class VizpadTestRunner {
     
     testResults.chartLoadTime = chartLoadTime;
     this.metrics.addMetric(userId, 'chartLoadTime', chartLoadTime);
-    console.log(`User ${userId}: Chart loaded in ${chartLoadTime}s`);
+    console.log(`User ${userId}: Charts loaded in ${chartLoadTime}s`);
 
   }
   async switchTab(userId, testResults, browserManager) {
@@ -402,11 +404,12 @@ class VizpadTestRunner {
     
       //performing filter tests
       const testStartTime = new Date();
-      await this.performTimeFilterTest(userId, testResults, browserManager);
 
       await this.performAreaFilterTest(userId, testResults, browserManager);
-    
+      await this.performRegionFilterTest(userId, testResults, browserManager);
+
       await this.performTerritoryFilterTest(userId, testResults, browserManager);
+
       const TotalFilterTestTime = (new Date() - testStartTime) / 1000;
       testResults.TotalFilterTestTime = TotalFilterTestTime;
       this.metrics.addMetric(userId, 'TotalFilterTestTime', TotalFilterTestTime);
@@ -444,6 +447,39 @@ class VizpadTestRunner {
       this.metrics.addMetric(userId, 'areaFilterTime', areaFilterTime);
       console.log(`User ${userId}: Area filter completed in ${areaFilterTime}s`);
   }
+  async performRegionFilterTest(userId, testResults, browserManager) {
+    console.log(`User ${userId}: Starting region filter test`);
+          
+    // Get random area data
+    const randomRegions = getRandomData('region');
+    console.log(`User ${userId}: Testing with regions: ${randomRegions.join(', ')}`);
+    
+    await browserManager.waitForElement(CONFIG.selectors.searchInput);
+    let elements = await browserManager.page.$$(CONFIG.selectors.searchInput);
+    await browserManager.page.evaluate((element) => {
+      element.scrollIntoView();
+      element.click();
+    }, elements[1]);
+    
+    // Apply each area filter
+    for (const region of randomRegions) {
+      await this.searchAndSelectValue(region, browserManager);
+    }
+    
+  // Apply the filter
+    await browserManager.waitForElement(CONFIG.selectors.filterApplyBtn);
+    await browserManager.page.click(CONFIG.selectors.filterApplyBtn);
+    const regionFilterStartTime = new Date();
+    await this.waitForChartToLoad(browserManager);
+    console.log(`User ${userId}: Waiting for All API calls to complete`);
+    await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
+    console.log(`User ${userId}: All API calls completed`);
+    const regionFilterTime = (new Date() - regionFilterStartTime) / 1000;
+    testResults.regionFilterTime = regionFilterTime;
+    this.metrics.addMetric(userId, 'regionFilterTime', regionFilterTime);
+    console.log(`User ${userId}: Region filter completed in ${regionFilterTime}s`);
+  }
+
     async searchAndSelectValue(value, browserManager) {
         await browserManager.waitForElement(CONFIG.selectors.searchValueInput);
         
@@ -472,7 +508,7 @@ class VizpadTestRunner {
     await browserManager.page.evaluate((element) => {
       element.scrollIntoView();
       element.click();
-    }, elements[1]);
+    }, elements[2]);
       
     
     // Apply each territory filter
@@ -670,7 +706,7 @@ class VizpadTestRunner {
     if (CONFIG.tabIndex && CONFIG.tabIndex !== '' && CONFIG.tabIndex !== 'null' && CONFIG.tabIndex !== 'undefined' && !isNaN(tabIndexNum) && tabIndexNum > 0) {
       headerRow += ',Tab Switch (s)';
     }
-    headerRow += ',Area Filter (s),Territory Filter (s),Time Filter (s),Total Filter Test (s),Status,Error Message\n';
+    headerRow += ',Area Filter (s),Region Filter (s),Territory Filter (s),Total Filter Test (s),Status,Error Message\n';
     csvContent += headerRow;
     
     // Add data rows
@@ -682,7 +718,7 @@ class VizpadTestRunner {
         dataRow += `,${result.tabSwitchTime || 0}`;
       }
       
-      dataRow += `,${result.areaFilterTime || 0},${result.territoryFilterTime || 0},${result.timeFilterTime || 0},${result.TotalFilterTestTime || 0}`;
+      dataRow += `,${result.areaFilterTime || 0},${result.regionFilterTime || 0},${result.territoryFilterTime || 0},${result.TotalFilterTestTime || 0}`;
       
       // Add status and error message
       const status = result.success ? 'SUCCESS' : 'FAILED';
@@ -726,8 +762,8 @@ class VizpadTestRunner {
       }
       
       row['Area Filter (s)'] = result.areaFilterTime.toFixed(2);
+      row['Region Filter (s)'] = result.regionFilterTime.toFixed(2);
       row['Territory Filter (s)'] = result.territoryFilterTime.toFixed(2);
-      row['Time Filter (s)'] = result.timeFilterTime.toFixed(3);
       row['Total Filter Test (s)'] = result.TotalFilterTestTime.toFixed(2);
       row['Status'] = status;
       
@@ -745,8 +781,8 @@ class VizpadTestRunner {
         'Average Vizpad Load (s)': (successfulResults.reduce((sum, r) => sum + r.vizpadLoadTime, 0) / successfulResults.length).toFixed(2),
         'Average Chart Load (s)': (successfulResults.reduce((sum, r) => sum + r.chartLoadTime, 0) / successfulResults.length).toFixed(2),
         'Average Area Filter (s)': (successfulResults.reduce((sum, r) => sum + r.areaFilterTime, 0) / successfulResults.length).toFixed(2),
+        'Average Region Filter (s)': (successfulResults.reduce((sum, r) => sum + r.regionFilterTime, 0) / successfulResults.length).toFixed(2),
         'Average Territory Filter (s)': (successfulResults.reduce((sum, r) => sum + r.territoryFilterTime, 0) / successfulResults.length).toFixed(2),
-        'Average Time Filter (s)': (successfulResults.reduce((sum, r) => sum + r.timeFilterTime, 0) / successfulResults.length).toFixed(3),
         'Average Total Filter Test (s)': (successfulResults.reduce((sum, r) => sum + r.TotalFilterTestTime, 0) / successfulResults.length).toFixed(2),
       };
       const tabIndexNum = parseInt(CONFIG.tabIndex);

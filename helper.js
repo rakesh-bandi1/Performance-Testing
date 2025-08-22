@@ -62,8 +62,11 @@ function getRandomData(dataType, minCount = null, maxCount = null) {
     case 'territory':
       dataArray = chartData.territoryData;
       break;
+    case 'region':
+      dataArray = chartData.regionData;
+      break;
     default:
-      throw new Error(`Unknown data type: ${dataType}. Supported types: 'area', 'territory', 'time'`);
+      throw new Error(`Unknown data type: ${dataType}. Supported types: 'area', 'territory', 'time', 'region'`);
   }
   
   // Generate random count between min and max
