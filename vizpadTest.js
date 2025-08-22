@@ -1,6 +1,6 @@
 const ObjectsToCsv = require('objects-to-csv');
 const puppeteer = require('puppeteer');
-const { getRandomData } = require('./helper.js');
+const { getRandomData, getRandomFilterData } = require('./helper.js');
 const EmailService = require('./emailService.js');
 
 // Configuration
@@ -14,6 +14,7 @@ const CONFIG = {
     element: 300000, // 30 seconds for element timeout
     longNavigation: 1000000,
   },
+  filterData:[],
   viewport: { width: 1366, height: 768 },
   selectors: {
       chartLoading: 'Vizpad is loading...',
@@ -399,22 +400,23 @@ class VizpadTestRunner {
     
       //performing filter tests
       const testStartTime = new Date();
+      const filterData = getRandomFilterData();
+      await this.performAreaFilterTest(userId, testResults, browserManager, filterData.Area);
 
-      await this.performAreaFilterTest(userId, testResults, browserManager);
-      await this.performRegionFilterTest(userId, testResults, browserManager);
+      await this.performRegionFilterTest(userId, testResults, browserManager, filterData.Region);
 
-      await this.performTerritoryFilterTest(userId, testResults, browserManager);
+      await this.performTerritoryFilterTest(userId, testResults, browserManager, filterData.territory);
+
 
       const TotalFilterTestTime = (new Date() - testStartTime) / 1000;
       testResults.TotalFilterTestTime = TotalFilterTestTime;
       this.metrics.addMetric(userId, 'TotalFilterTestTime', TotalFilterTestTime);
       console.log(`User ${userId}: Filter test completed in ${TotalFilterTestTime}s`);
   }
-  async performAreaFilterTest(userId, testResults, browserManager) {
+  async performAreaFilterTest(userId, testResults, browserManager, randomAreas) {
       console.log(`User ${userId}: Starting area filter test`);
           
       // Get random area data
-      const randomAreas = getRandomData('area');
       console.log(`User ${userId}: Testing with areas: ${randomAreas.join(', ')}`);
       
       await browserManager.waitForElement(CONFIG.selectors.searchInput);
@@ -442,11 +444,10 @@ class VizpadTestRunner {
       this.metrics.addMetric(userId, 'areaFilterTime', areaFilterTime);
       console.log(`User ${userId}: Area filter completed in ${areaFilterTime}s`);
   }
-  async performRegionFilterTest(userId, testResults, browserManager) {
+  async performRegionFilterTest(userId, testResults, browserManager, randomRegions) {
     console.log(`User ${userId}: Starting region filter test`);
           
     // Get random area data
-    const randomRegions = getRandomData('region');
     console.log(`User ${userId}: Testing with regions: ${randomRegions.join(', ')}`);
     
     await browserManager.waitForElement(CONFIG.selectors.searchInput);
@@ -492,10 +493,9 @@ class VizpadTestRunner {
         await browserManager.waitForElement(CONFIG.selectors.checkBox);
         await browserManager.page.click(CONFIG.selectors.checkBox);
     }
-  async performTerritoryFilterTest(userId, testResults, browserManager) {
+  async performTerritoryFilterTest(userId, testResults, browserManager, randomTerritories) {
     console.log(`User ${userId}: Starting territory filter test`);
     // Get random territory data
-    const randomTerritories = getRandomData('territory');
     console.log(`User ${userId}: Testing with territories: ${randomTerritories.join(', ')}`);
     
     await browserManager.waitForElement(CONFIG.selectors.searchInput);

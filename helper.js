@@ -86,10 +86,16 @@ function getRandomData(dataType, minCount = null, maxCount = null) {
   // Return the first 'count' elements
   return shuffled.slice(0, count);
 }
+function getRandomFilterData() {
+  const filterData = chartData.filterData;
+  const randomIndex = 1;
+  return filterData[randomIndex];
+}
 
 module.exports = {
   AreaChartData,
   TerritoryChartData,
   chartData,
-  getRandomData
+  getRandomData,
+  getRandomFilterData
 };
