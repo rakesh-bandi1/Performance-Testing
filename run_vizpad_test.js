@@ -20,12 +20,12 @@ async function runInteractiveVizpadTest() {
     
     // 1. Ask for complete vizpad URL
     // const vizpadUrl = await askQuestion('Enter the complete vizpad URL: ');
-    const vizpadUrl = 'https://galaxyai.bayer.com/dashboard/270c0367-ce31-4f73-ad95-3cbd64415b0b/a5986ed7-28c8-4739-bc84-8ef2dfead134?utm_source=546bf610-3e40-4ebb-b57e-78a7f5a076fc';
+    const vizpadUrl = 'https://galaxyai.bayer.com/dashboard/72ed4cae-f8c3-4d20-a8d3-897355f56d36/875c7d53-6502-4b78-a1e7-588104950912?utm_source=c2cd4d7b-be2e-4938-812d-f8e0fb4c1bbd';
     const url = vizpadUrl.trim() === '' ? 'https://galaxyai.bayer.com/dashboard/270c0367-ce31-4f73-ad95-3cbd64415b0b/a5986ed7-28c8-4739-bc84-8ef2dfead134?utm_source=546bf610-3e40-4ebb-b57e-78a7f5a076fc' : vizpadUrl.trim();
     
     // 2. Ask for number of users
     // const numUsers = await askQuestion('How many users do you want to test? (default: 1): ');
-    const numUsers = '10';
+    const numUsers = '1';
     const users = numUsers.trim() === '' ? '1' : numUsers.trim();
     
     // 3. Ask for tab index

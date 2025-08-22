@@ -1,0 +1,17 @@
+# Git and version control
+.git
+.gitignore
+
+# Dependencies (these should be installed inside the container)
+node_modules
+
+# Environment variables and secrets
+.env*
+*.log
+
+# IDE and OS-specific files
+.vscode/
+.idea/
+README.md
+Dockerfile
+.dockerignore

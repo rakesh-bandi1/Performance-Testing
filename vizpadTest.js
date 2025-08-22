@@ -93,6 +93,11 @@ class BrowserManager {
   async launch() {
     this.browser = await puppeteer.launch({
       headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage'
+      ]
     });
     this.page = await this.browser.newPage();
     await this.page.setViewport(CONFIG.viewport);
