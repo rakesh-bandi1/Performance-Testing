@@ -24,7 +24,7 @@ async function runInteractiveVizpadTest() {
     
     // 2. Ask for number of users
     // const numUsers = await askQuestion('How many users do you want to test? (default: 1): ');
-    const users = '1';
+    const users = '10';
     
     // 3. Ask for tab index
     // const isTabSwitch = await askQuestion('Enter the tab switch (default: false): ');

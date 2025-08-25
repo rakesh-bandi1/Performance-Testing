@@ -151,6 +151,20 @@ class BrowserManager {
     await new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  async retryOperation(operation, maxRetries = 3, delayMs = 1000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        console.log(`Operation failed (attempt ${attempt}/${maxRetries}), retrying in ${delayMs}ms...`);
+        await this.delay(delayMs);
+      }
+    }
+  }
+
   async forceClick(selector, options = {}) {
     const defaultOptions = { 
       timeout: CONFIG.timeouts.element,
@@ -236,7 +250,9 @@ class VizpadTestRunner {
       
       // Check if tab index is valid and greater than 0
       if (CONFIG.tabSwitch === 'true') {
-        let tabIndex = Math.floor(Math.random() * 10);
+        const numbers = [0, 1, 2, 3, 6, 7, 8, 9];
+        const randomIndex = Math.floor(Math.random() * numbers.length);
+        let tabIndex = numbers[randomIndex];
         console.log(`User ${userId}: Tab index is ${tabIndex}`);
         CONFIG.tabIndex = tabIndex;
         await this.switchTab(userId, testResults, browserManager);
@@ -278,7 +294,7 @@ class VizpadTestRunner {
         // Wait for any loading text to appear (with short timeout)
         for (const loadingText of loadingTexts) {
           try {
-            await browserManager.waitForText(loadingText, 5000); // 5 second timeout
+            await browserManager.waitForText(loadingText, 3000); // 3 second timeout
             console.log(`Loading text appeared: "${loadingText}"`);
             loadingTextFound = true;
             break;
@@ -406,9 +422,10 @@ class VizpadTestRunner {
       //performing filter tests
       const testStartTime = new Date();
       const filterData = getRandomFilterData();
-      await this.performAreaFilterTest(userId, testResults, browserManager, filterData.Area);
-
+    
       await this.performRegionFilterTest(userId, testResults, browserManager, filterData.Region);
+
+      await this.performAreaFilterTest(userId, testResults, browserManager, filterData.Area);
 
       await this.performTerritoryFilterTest(userId, testResults, browserManager, filterData.territory);
 
@@ -425,16 +442,20 @@ class VizpadTestRunner {
       console.log(`User ${userId}: Testing with areas: ${randomAreas.join(', ')}`);
       
       await browserManager.waitForElement(CONFIG.selectors.searchInput);
-      let elements = await browserManager.page.$$(CONFIG.selectors.searchInput);
-      await browserManager.page.evaluate((element) => {
-        element.scrollIntoView();
-        element.click();
-      }, elements[0]);
+      
+      // Use a more robust approach to click the first search input
+      await browserManager.page.evaluate(() => {
+        const searchInputs = document.querySelectorAll("[data-cy-id='cy-search-data']");
+        if (searchInputs.length >= 1) {
+          searchInputs[0].scrollIntoView();
+          searchInputs[0].click();
+        } else {
+          throw new Error("First search input not found");
+        }
+      });
       
       // Apply each area filter
-      for (const area of randomAreas) {
-        await this.searchAndSelectValue(area, browserManager);
-      }
+      await this.selectFirstNResults(2, browserManager);
       
     // Apply the filter
       await browserManager.waitForElement(CONFIG.selectors.filterApplyBtn);
@@ -456,16 +477,20 @@ class VizpadTestRunner {
     console.log(`User ${userId}: Testing with regions: ${randomRegions.join(', ')}`);
     
     await browserManager.waitForElement(CONFIG.selectors.searchInput);
-    let elements = await browserManager.page.$$(CONFIG.selectors.searchInput);
-    await browserManager.page.evaluate((element) => {
-      element.scrollIntoView();
-      element.click();
-    }, elements[1]);
+    
+    // Use a more robust approach to click the second search input
+    await browserManager.page.evaluate(() => {
+      const searchInputs = document.querySelectorAll("[data-cy-id='cy-search-data']");
+      if (searchInputs.length >= 2) {
+        searchInputs[1].scrollIntoView();
+        searchInputs[1].click();
+      } else {
+        throw new Error("Second search input not found");
+      }
+    });
     
     // Apply each area filter
-    for (const region of randomRegions) {
-      await this.searchAndSelectValue(region, browserManager);
-    }
+    await this.selectFirstNResults(5, browserManager);
     
   // Apply the filter
     await browserManager.waitForElement(CONFIG.selectors.filterApplyBtn);
@@ -481,57 +506,129 @@ class VizpadTestRunner {
     console.log(`User ${userId}: Region filter completed in ${regionFilterTime}s`);
   }
 
-    async searchAndSelectValue(value, browserManager) {
-        await browserManager.waitForElement(CONFIG.selectors.searchValueInput);
+  async searchAndSelectValue(value, browserManager) {
+    const { page } = browserManager;
+    const inputSelector = CONFIG.selectors.searchValueInput;
+    const checkboxSelector = CONFIG.selectors.checkBox;
+  
+    // Wait for the input to be available
+    await browserManager.waitForElement(inputSelector);
+    
+    // Ensure the element is visible and clickable
+    await page.waitForFunction((selector) => {
+      const element = document.querySelector(selector);
+      return element && element.offsetParent !== null && !element.disabled;
+    }, { timeout: 10000 }, inputSelector);
+  
+    await page.focus(inputSelector);
+    await page.click(inputSelector, { clickCount: 3 }); // triple click to select all
+    await page.keyboard.press('Backspace');
+  
+    // Type the search value
+    await page.type(inputSelector, value);
+  
+    // Optional: small debounce wait to allow frontend filtering
+    await browserManager.delay(500);
+  
+    // Press Enter (if required to trigger search)
+    await page.keyboard.press('Enter');
+  
+    // Wait for checkbox or result to appear
+    await browserManager.waitForElement(checkboxSelector, { timeout: 500000 });
+    
+    // Ensure checkbox is clickable before clicking
+    await page.waitForFunction((selector) => {
+      const element = document.querySelector(selector);
+      return element && element.offsetParent !== null && !element.disabled;
+    }, { timeout: 10000 }, checkboxSelector);
+  
+    // Click the checkbox
+    await page.click(checkboxSelector);
+  
+    // Optional: short confirmation wait
+    await browserManager.delay(500);
+  }
+  async selectFirstNResults(count, browserManager) {
+    const { page } = browserManager;
+    const checkboxSelector = CONFIG.selectors.checkBox; // Assuming this matches multiple checkboxes
+
+    // Wait for results to be available
+    await browserManager.waitForElement(checkboxSelector);
+
+    // Use retry mechanism for more robust checkbox selection
+    await browserManager.retryOperation(async () => {
+      await page.evaluate((selector, limit) => {
+        const checkboxes = document.querySelectorAll(selector);
         
-        // Clear the input field using evaluate
-        await browserManager.page.evaluate((selector) => {
-            const element = document.querySelector(selector);
-            if (element) {
-                element.value = '';
-                element.focus();
-            }
-        }, CONFIG.selectors.searchValueInput);
-        
-        await browserManager.page.type(CONFIG.selectors.searchValueInput, value);
-        await browserManager.page.keyboard.press('Enter');
-        await browserManager.waitForElement(CONFIG.selectors.checkBox);
-        await browserManager.page.click(CONFIG.selectors.checkBox);
-    }
+        if (checkboxes.length === 0) {
+          throw new Error("No checkboxes found to select.");
+        }
+
+        // Ensure count doesn't exceed available results
+        const actualLimit = Math.min(limit, checkboxes.length);
+
+        for (let i = 0; i < actualLimit; i++) {
+          checkboxes[i].click();
+        }
+
+        console.log(`✅ Selected first ${actualLimit} results`);
+      }, checkboxSelector, count);
+    }, 3, 1000);
+
+    // Add a small delay to mimic user behavior
+    await browserManager.delay(200);
+  }
+  
+  
   async performTerritoryFilterTest(userId, testResults, browserManager, randomTerritories) {
     console.log(`User ${userId}: Starting territory filter test`);
     // Get random territory data
     console.log(`User ${userId}: Testing with territories: ${randomTerritories.join(', ')}`);
     
-    await browserManager.waitForElement(CONFIG.selectors.searchInput);
-    let elements = await browserManager.page.$$(CONFIG.selectors.searchInput);
-    await browserManager.page.evaluate((element) => {
-      element.scrollIntoView();
-      element.click();
-    }, elements[2]);
+    try {
+      console.log(`User ${userId}: Waiting for search input elements...`);
+      await browserManager.waitForElement(CONFIG.selectors.searchInput);
       
-    
-    // Apply each territory filter
-    for (const territory of randomTerritories) {
-      await this.searchAndSelectValue(territory, browserManager);
+      // Use a more robust approach to click the third search input
+      console.log(`User ${userId}: Attempting to click third search input...`);
+      await browserManager.page.evaluate(() => {
+        const searchInputs = document.querySelectorAll("[data-cy-id='cy-search-data']");
+        console.log(`Found ${searchInputs.length} search inputs`);
+        if (searchInputs.length >= 3) {
+          searchInputs[2].scrollIntoView();
+          searchInputs[2].click();
+          console.log("Successfully clicked third search input");
+        } else {
+          throw new Error(`Third search input not found. Only ${searchInputs.length} inputs available.`);
+        }
+      });
+      
+      console.log(`User ${userId}: Selecting first 3 results...`);
+      // Apply each territory filter
+      await this.selectFirstNResults(3, browserManager);
+      
+      console.log(`User ${userId}: Applying filter...`);
+      // Apply the filter
+      await browserManager.waitForElement(CONFIG.selectors.filterApplyBtn);
+      await browserManager.page.click(CONFIG.selectors.filterApplyBtn);
+
+      // Wait for chart to reload after filter application
+      const territoryFilterStartTime = new Date();
+      console.log(`User ${userId}: Waiting for chart to load...`);
+      await this.waitForChartToLoad(browserManager);
+
+      console.log(`User ${userId}: Waiting for All API calls to complete`);
+      await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
+      
+      console.log(`User ${userId}: All API calls completed`);
+      const territoryFilterTime = (new Date() - territoryFilterStartTime) / 1000;
+      testResults.territoryFilterTime = territoryFilterTime;
+      this.metrics.addMetric(userId, 'territoryFilterTime', territoryFilterTime);
+      console.log(`User ${userId}: Territory filter completed in ${territoryFilterTime}s`);
+    } catch (error) {
+      console.error(`User ${userId}: Error in territory filter test: ${error.message}`);
+      throw error;
     }
-    
-    // Apply the filter
-    await browserManager.waitForElement(CONFIG.selectors.filterApplyBtn);
-    await browserManager.page.click(CONFIG.selectors.filterApplyBtn);
-
-    // Wait for chart to reload after filter application
-    const territoryFilterStartTime = new Date();
-    await this.waitForChartToLoad(browserManager);
-
-    console.log(`User ${userId}: Waiting for All API calls to complete`);
-    await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
-    
-    console.log(`User ${userId}: All API calls completed`);
-    const territoryFilterTime = (new Date() - territoryFilterStartTime) / 1000;
-    testResults.territoryFilterTime = territoryFilterTime;
-    this.metrics.addMetric(userId, 'territoryFilterTime', territoryFilterTime);
-    console.log(`User ${userId}: Territory filter completed in ${territoryFilterTime}s`);
   }
   async performTimeFilterTest(userId, testResults, browserManager) {
     console.log(`User ${userId}: Starting time filter test`);

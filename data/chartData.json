@@ -277,8 +277,6 @@
     "AC27",
     "AC28",
     "AC29",
-    "AC40",
-    "AC41",
     "AC51",
     "AC52",
     "AC53",
@@ -299,15 +297,15 @@
     "defaultTimeout": 30000
   },
   "filterData": [
-    {"Region":["AA21","AA23","AA26","AC51"],"Area":["AA","AC"],"territory":["004B","005B","032B","A466","A462"]},
-    {"Region":["ZR99","ZR90","AB33","AA32","AA22"],"Area":["AB","ZR","AA"],"territory":["013A","98CZ","90CZ","416A","362A"]},
-    {"Region":["AB31","AB33","AC20","AC23","AA54"],"Area":["AA","AB","AC"],"territory":["070B","078B","103B","124B","A525"]},
-    {"Region":["AC26","AC52","ZR90","AC53","ZR99"],"Area":["AC","ZR"],"territory":["129B","210B","337A","90CZ","99CZ"]},
-    {"Region":["AC26","AC27","ZR90","AC51","AC28"],"Area":["AC","ZR"],"territory":["112B","217B","280A","90CZ"]},
-    {"Region":["AC27","AC21","AB25","AA52"],"Area":["AA","AB","AC"],"territory":["094B","109B","243A","A419","A519"]},
-    {"Region":["AB22","AB24","AC23","ZR99"],"Area":["AB","AC"],"territory":["181B","183B","328A","336A","053A"]},
-    {"Region":["ZR99","AC24","AB20","AA29","AA21"],"Area":["AA","AC","ZR","AB"],"territory":["004B","007B","089A","133B"]},
-    {"Region":["AB32","AB21","AA24","AA21"],"Area":["AA","AB"],"territory":["027A","045A","026B","193B"]},
-    {"Region":["AB32","AB29","AA52","ZR99"],"Area":["AA","AB","ZR"],"territory":["090B","A424","A426","A532","A426"]}
+    {"Region":["AA21","AA23","AA26","AC51"],"Area":["AA","AC"],"territory":["074A","012A","008A","A466","A462"]},
+   {"Region":["ZR99","ZR90","AB33","AA32","AA22"],"Area":["AB","ZR","AA"],"territory":["364A","98CZ","90CZ","416A","357A"]},
+   {"Region":["AB31","AB33","AC20","AC23","AA54"],"Area":["AA","AB","AC"],"territory":["185A","187A","213A","A557","A525"]},
+   {"Region":["AC26","AC52","ZR90","AC53","ZR99"],"Area":["AC","ZR"],"territory":["339A","A518","337A","90CZ","99CZ"]},
+   {"Region":["AC26","AC27","ZR90","AC51","AC28"],"Area":["AC","ZR"],"territory":["282A","429A","280A","90CZ"]},
+   {"Region":["AC27","AC21","AB25","AA52"],"Area":["AA","AB","AC"],"territory":["223A","225A","243A","A419","A519"]},
+   {"Region":["AB22","AB24","AC23","ZR99"],"Area":["AB","AC"],"territory":["052A","065A","328A","336A","053A"]},
+   {"Region":["ZR99","AC24","AB20","AA29","AA21"],"Area":["AA","AC","ZR","AB"],"territory":["008A","021A","089A","095A"]},
+   {"Region":["AB32","AB21","AA24","AA21"],"Area":["AA","AB"],"territory":["027A","045A","057A","012A"]},
+   {"Region":["AB32","AB29","AA52","ZR99"],"Area":["AA","AB","ZR"],"territory":["236A","A424","A426","A532","A428"]}
   ]
-} 
+}

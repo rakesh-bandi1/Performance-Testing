@@ -88,7 +88,7 @@ function getRandomData(dataType, minCount = null, maxCount = null) {
 }
 function getRandomFilterData() {
   const filterData = chartData.filterData;
-  const randomIndex = 1;
+  const randomIndex = Math.floor(Math.random() * filterData.length);
   return filterData[randomIndex];
 }
 
