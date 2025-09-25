@@ -15,7 +15,7 @@ const CONFIG = {
     longNavigation: 1000000,
   },
   filterData:[],
-  viewport: { width: 1366, height: 768 },
+  viewport: { width: 1512, height: 864 },
   selectors: {
       chartLoading: 'Vizpad is loading...',
       vizContainer: '.vizContainer',
@@ -36,7 +36,8 @@ const CONFIG = {
       endDate: "[data-cy-id='cy-tmslc-ctr-enddt']",
       applyTimeFilterBtn: "[data-cy-id='cy-tmslc-aply']",
       applyBtn: "[data-cy-id='cy-popup-aply']",
-      tab: "cy-tb"
+      tab: "cy-tb",
+      appLoader: '#appLoader'
       
 
     },
@@ -48,6 +49,49 @@ const CONFIG = {
     },
 
 };
+
+// Loader Component for handling app loader
+class LoaderComponent {
+    constructor() {
+        this.maxWaitTime = 3 * 60 * 1000; // 3 minutes in ms
+    }
+
+    async waitForLoading(page, startTime = Date.now()) {
+        const elapsed = Date.now() - startTime;
+
+        if (elapsed > this.maxWaitTime) {
+            console.log('Loader did not disappear within 3 minutes ❌, continuing with the test');
+            return;
+        }
+
+        try {
+            const isLoaderVisible = await page.evaluate(() => {
+                const loader = document.querySelector('#appLoader');
+                return loader && loader.offsetParent !== null && 
+                       window.getComputedStyle(loader).display !== 'none' && 
+                       window.getComputedStyle(loader).visibility !== 'hidden';
+            });
+
+            if (isLoaderVisible) {
+                console.log('App loader is visible, waiting...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return this.waitForLoading(page, startTime);
+            } else {
+                console.log('Loader is gone ✅');
+            }
+        } catch (error) {
+            console.log('Error checking loader visibility, continuing...');
+        }
+    }
+
+    async waitForLoaderToDisappear(page) {
+        console.log('Waiting for app loader to disappear...');
+        await this.waitForLoading(page);
+    }
+}
+
+// Create a singleton instance
+const loaderComponent = new LoaderComponent();
 
 // Performance metrics class
 class PerformanceMetrics {
@@ -94,11 +138,16 @@ class BrowserManager {
 
   async launch() {
     this.browser = await puppeteer.launch({
-      headless: true,
+      headless: false,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',   // disables GPU canvas
+        '--disable-gpu',                     // save GPU overhead (Linux headless mode often needs this)
+        '--disable-software-rasterizer',     // prevent GPU fallback
+        '--no-zygote',                       // reduce resource usage
+        '--single-process'                   // runs in one process (good for constrained envs)
       ]
     });
     this.page = await this.browser.newPage();
@@ -149,6 +198,10 @@ class BrowserManager {
 
   async delay(ms) {
     await new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async waitForAppLoader() {
+    await loaderComponent.waitForLoaderToDisappear(this.page);
   }
 
   async retryOperation(operation, maxRetries = 3, delayMs = 1000) {
@@ -250,7 +303,7 @@ class VizpadTestRunner {
       
       // Check if tab index is valid and greater than 0
       if (CONFIG.tabSwitch === 'true') {
-        const numbers = [0, 1, 2, 3, 6, 7, 8, 9];
+        const numbers = [1, 2, 3, 7, 8, 9];
         const randomIndex = Math.floor(Math.random() * numbers.length);
         let tabIndex = numbers[randomIndex];
         console.log(`User ${userId}: Tab index is ${tabIndex}`);
@@ -389,6 +442,7 @@ class VizpadTestRunner {
     console.log(`User ${userId}: Waiting for chart to load...`);
     const chartStartTime = new Date();
     await this.waitForChartToLoad(browserManager);
+    await browserManager.waitForAppLoader();
     const chartLoadTime = (new Date() - chartStartTime) / 1000;
     
     testResults.chartLoadTime = chartLoadTime;
@@ -406,6 +460,7 @@ class VizpadTestRunner {
       
       let tabSwitchStartTime = new Date();
       await this.waitForChartToLoad(browserManager);
+      await browserManager.waitForAppLoader();
       let tabSwitchTime = (new Date() - tabSwitchStartTime) / 1000;
       
       testResults.tabSwitchTime = tabSwitchTime;
@@ -462,6 +517,7 @@ class VizpadTestRunner {
       await browserManager.page.click(CONFIG.selectors.filterApplyBtn);
       const areaFilterStartTime = new Date();
       await this.waitForChartToLoad(browserManager);
+      await browserManager.waitForAppLoader();
       console.log(`User ${userId}: Waiting for All API calls to complete`);
       await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
       console.log(`User ${userId}: All API calls completed`);
@@ -490,13 +546,14 @@ class VizpadTestRunner {
     });
     
     // Apply each area filter
-    await this.selectFirstNResults(5, browserManager);
+    await this.selectFirstNResults(4, browserManager);
     
   // Apply the filter
     await browserManager.waitForElement(CONFIG.selectors.filterApplyBtn);
     await browserManager.page.click(CONFIG.selectors.filterApplyBtn);
     const regionFilterStartTime = new Date();
     await this.waitForChartToLoad(browserManager);
+    await browserManager.waitForAppLoader();
     console.log(`User ${userId}: Waiting for All API calls to complete`);
     await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
     console.log(`User ${userId}: All API calls completed`);
@@ -556,8 +613,7 @@ class VizpadTestRunner {
     await browserManager.waitForElement(checkboxSelector);
 
     // Use retry mechanism for more robust checkbox selection
-    await browserManager.retryOperation(async () => {
-      await page.evaluate((selector, limit) => {
+    await page.evaluate((selector, limit) => {
         const checkboxes = document.querySelectorAll(selector);
         
         if (checkboxes.length === 0) {
@@ -569,14 +625,12 @@ class VizpadTestRunner {
 
         for (let i = 0; i < actualLimit; i++) {
           checkboxes[i].click();
+
         }
 
         console.log(`✅ Selected first ${actualLimit} results`);
-      }, checkboxSelector, count);
-    }, 3, 1000);
+    }, checkboxSelector, count);
 
-    // Add a small delay to mimic user behavior
-    await browserManager.delay(200);
   }
   
   
@@ -616,6 +670,7 @@ class VizpadTestRunner {
       const territoryFilterStartTime = new Date();
       console.log(`User ${userId}: Waiting for chart to load...`);
       await this.waitForChartToLoad(browserManager);
+      await browserManager.waitForAppLoader();
 
       console.log(`User ${userId}: Waiting for All API calls to complete`);
       await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
