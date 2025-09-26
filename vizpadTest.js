@@ -312,7 +312,7 @@ class VizpadTestRunner {
       await this.performAreaFilterTest(userId, testResults, browserManager);
       
       // Step 3: Switch to a random tab and wait for all charts to load
-      const availableTabs = [1, 2, 3, 7, 8, 9];
+      const availableTabs = [1, 2, 3, 4];
       const randomTab1 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
       testResults.randomTab1 = randomTab1;
       console.log(`User ${userId}: Step 3 - Switching to random Tab ${randomTab1}`);
