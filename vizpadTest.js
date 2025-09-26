@@ -37,7 +37,10 @@ const CONFIG = {
       applyTimeFilterBtn: "[data-cy-id='cy-tmslc-aply']",
       applyBtn: "[data-cy-id='cy-popup-aply']",
       tab: "cy-tb",
-      appLoader: '#appLoader'
+      appLoader: '#appLoader',
+      territoryEle: `//input[@data-cy-id='cy-viz-title' and @value='Territory']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
+      regionEle: `//input[@data-cy-id='cy-viz-title' and @value='Region']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
+      areaEle: `//input[@data-cy-id='cy-viz-title' and @value='Area']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
       
 
     },
@@ -138,7 +141,7 @@ class BrowserManager {
 
   async launch() {
     this.browser = await puppeteer.launch({
-      headless: false,
+      headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -284,9 +287,14 @@ class VizpadTestRunner {
       vizpadLoadTime: 0,
       chartLoadTime: 0,
       areaFilterTime: 0,
+      tabSwitchTime1: 0,
+      tabSwitchTime2: 0,
       regionFilterTime: 0,
       territoryFilterTime: 0,
-      TotalFilterTestTime: 0,
+      tabSwitchTime3: 0,
+      randomTab1: 0,
+      randomTab2: 0,
+      randomTab3: 0,
       success: true,
     };
 
@@ -295,22 +303,48 @@ class VizpadTestRunner {
     try {
       await browserManager.launch();
       
-      // Test vizpad performance
+      // Step 1: Open the Embed URL and wait for all charts to load
+      console.log(`User ${userId}: Step 1 - Loading Vizpad and waiting for charts`);
       await this.performVizpadTest(userId, testResults, browserManager);
       
-      // Debug: Log the tab index value and type
-      console.log(`User ${userId}: CONFIG.tabIndex = "${CONFIG.tabIndex}" (type: ${typeof CONFIG.tabIndex})`);
+      // Step 2: Apply Area filter and wait for all charts to load
+      console.log(`User ${userId}: Step 2 - Applying Area filter`);
+      await this.performAreaFilterTest(userId, testResults, browserManager);
       
-      // Check if tab index is valid and greater than 0
-      if (CONFIG.tabSwitch === 'true') {
-        const numbers = [1, 2, 3, 7, 8, 9];
-        const randomIndex = Math.floor(Math.random() * numbers.length);
-        let tabIndex = numbers[randomIndex];
-        console.log(`User ${userId}: Tab index is ${tabIndex}`);
-        CONFIG.tabIndex = tabIndex;
-        await this.switchTab(userId, testResults, browserManager);
-      } 
-      await this.performFilterTest(userId, testResults, browserManager);
+      // Step 3: Switch to a random tab and wait for all charts to load
+      const availableTabs = [1, 2, 3, 7, 8, 9];
+      const randomTab1 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      testResults.randomTab1 = randomTab1;
+      console.log(`User ${userId}: Step 3 - Switching to random Tab ${randomTab1}`);
+      await this.performTabSwitch(userId, testResults, browserManager, randomTab1, 'tabSwitchTime1');
+      
+      // Step 4: Switch to another random tab and wait for all charts to load
+      let randomTab2 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      // Ensure we don't select the same tab as the previous one
+      while (randomTab2 === randomTab1) {
+        randomTab2 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      }
+      testResults.randomTab2 = randomTab2;
+      console.log(`User ${userId}: Step 4 - Switching to random Tab ${randomTab2}`);
+      await this.performTabSwitch(userId, testResults, browserManager, randomTab2, 'tabSwitchTime2');
+      
+      // Step 5: Apply Region filter and wait for all charts to load
+      console.log(`User ${userId}: Step 5 - Applying Region filter`);
+      await this.performRegionFilterTest(userId, testResults, browserManager);
+      
+      // Step 6: Apply Territory filter and wait for all charts to load
+      console.log(`User ${userId}: Step 6 - Applying Territory filter`);
+      await this.performTerritoryFilterTest(userId, testResults, browserManager);
+      
+      // Step 7: Switch to yet another random tab and wait for all charts to load
+      let randomTab3 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      // Ensure we don't select the same tab as the previous ones
+      while (randomTab3 === randomTab1 || randomTab3 === randomTab2) {
+        randomTab3 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      }
+      testResults.randomTab3 = randomTab3;
+      console.log(`User ${userId}: Step 7 - Switching to random Tab ${randomTab3}`);
+      await this.performTabSwitch(userId, testResults, browserManager, randomTab3, 'tabSwitchTime3');
 
     } catch (error) {
       testResults.success = false;
@@ -322,7 +356,7 @@ class VizpadTestRunner {
 
     return testResults;
   }
-
+  
   async waitForChartToLoad(browserManager) { 
     try {
       // Check for either "Vizpad is loading..." or "chart is loading" text
@@ -394,6 +428,46 @@ class VizpadTestRunner {
       }
     }
   }
+  async clickElementByXPath(page, xpath, timeout = 30000) {
+    try {
+      
+      // Wait for element to be available using evaluate
+      await page.waitForFunction((xpath) => {
+        const result = document.evaluate(
+          xpath,
+          document,
+          null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          null
+        );
+        return result.singleNodeValue !== null;
+      }, { timeout }, xpath);
+      
+      // Find and click the element using evaluate
+      await page.evaluate((xpath) => {
+        const result = document.evaluate(
+          xpath,
+          document,
+          null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          null
+        );
+        const element = result.singleNodeValue;
+        if (element) {
+          element.scrollIntoView();
+          element.click();
+          console.log('Element clicked successfully via XPath');
+        } else {
+          throw new Error('Element not found');
+        }
+      }, xpath);
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to click element:', error.message);
+      return false;
+    }
+  }
 
   async performVizpadTest(userId, testResults, browserManager) {
     console.log(`User ${userId}: Starting vizpad test`);
@@ -450,9 +524,9 @@ class VizpadTestRunner {
     console.log(`User ${userId}: Charts loaded in ${chartLoadTime}s`);
 
   }
-  async switchTab(userId, testResults, browserManager) {
-    console.log(`User ${userId}: Starting tab switch to tab index ${CONFIG.tabIndex}`);
-    const tabSelector = `[data-cy-id='cy-tb${CONFIG.tabIndex}']`;
+  async performTabSwitch(userId, testResults, browserManager, tabIndex, timeField) {
+    console.log(`User ${userId}: Starting tab switch to tab index ${tabIndex}`);
+    const tabSelector = `[data-cy-id='cy-tb${tabIndex}']`;
     try {
       await browserManager.waitForElement(tabSelector);
       await browserManager.page.click(tabSelector);
@@ -463,11 +537,11 @@ class VizpadTestRunner {
       await browserManager.waitForAppLoader();
       let tabSwitchTime = (new Date() - tabSwitchStartTime) / 1000;
       
-      testResults.tabSwitchTime = tabSwitchTime;
-      this.metrics.addMetric(userId, 'tabSwitchTime', tabSwitchTime);
-      console.log(`User ${userId}: Tab switched in ${tabSwitchTime}s`);
+      testResults[timeField] = tabSwitchTime;
+      this.metrics.addMetric(userId, timeField, tabSwitchTime);
+      console.log(`User ${userId}: Tab ${tabIndex} switched in ${tabSwitchTime}s`);
     } catch (error) {
-      console.error(`User ${userId}: Failed to switch tab: ${error.message}`);
+      console.error(`User ${userId}: Failed to switch tab ${tabIndex}: ${error.message}`);
       throw new Error(`Tab switch failed: ${error.message}`);
     }
   }
@@ -490,72 +564,53 @@ class VizpadTestRunner {
       this.metrics.addMetric(userId, 'TotalFilterTestTime', TotalFilterTestTime);
       console.log(`User ${userId}: Filter test completed in ${TotalFilterTestTime}s`);
   }
-  async performAreaFilterTest(userId, testResults, browserManager, randomAreas) {
+  async performAreaFilterTest(userId, testResults, browserManager) {
       console.log(`User ${userId}: Starting area filter test`);
-          
-      // Get random area data
-      console.log(`User ${userId}: Testing with areas: ${randomAreas.join(', ')}`);
       
       await browserManager.waitForElement(CONFIG.selectors.searchInput);
-      
-      // Use a more robust approach to click the first search input
-      await browserManager.page.evaluate(() => {
-        const searchInputs = document.querySelectorAll("[data-cy-id='cy-search-data']");
-        if (searchInputs.length >= 1) {
-          searchInputs[0].scrollIntoView();
-          searchInputs[0].click();
-        } else {
-          throw new Error("First search input not found");
-        }
-      });
+    
+      await this.clickElementByXPath(browserManager.page, CONFIG.selectors.areaEle);
       
       // Apply each area filter
-      await this.selectFirstNResults(2, browserManager);
+      for (const ele of ["AA", "AB", "AC", "ZR"]) {
+        await this.searchAndSelectValue(ele, browserManager);
+      }
       
-    // Apply the filter
+      // Apply the filter
       await browserManager.waitForElement(CONFIG.selectors.filterApplyBtn);
       await browserManager.page.click(CONFIG.selectors.filterApplyBtn);
       const areaFilterStartTime = new Date();
       await this.waitForChartToLoad(browserManager);
       await browserManager.waitForAppLoader();
       console.log(`User ${userId}: Waiting for All API calls to complete`);
-      await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
+      await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 60000 });
       console.log(`User ${userId}: All API calls completed`);
       const areaFilterTime = (new Date() - areaFilterStartTime) / 1000;
       testResults.areaFilterTime = areaFilterTime;
       this.metrics.addMetric(userId, 'areaFilterTime', areaFilterTime);
       console.log(`User ${userId}: Area filter completed in ${areaFilterTime}s`);
   }
-  async performRegionFilterTest(userId, testResults, browserManager, randomRegions) {
+  async performRegionFilterTest(userId, testResults, browserManager) {
     console.log(`User ${userId}: Starting region filter test`);
-          
-    // Get random area data
-    console.log(`User ${userId}: Testing with regions: ${randomRegions.join(', ')}`);
     
     await browserManager.waitForElement(CONFIG.selectors.searchInput);
     
-    // Use a more robust approach to click the second search input
-    await browserManager.page.evaluate(() => {
-      const searchInputs = document.querySelectorAll("[data-cy-id='cy-search-data']");
-      if (searchInputs.length >= 2) {
-        searchInputs[1].scrollIntoView();
-        searchInputs[1].click();
-      } else {
-        throw new Error("Second search input not found");
-      }
-    });
+    // Use XPath to click the second search input (Region filter)
+    await this.clickElementByXPath(browserManager.page, CONFIG.selectors.regionEle);
     
-    // Apply each area filter
-    await this.selectFirstNResults(4, browserManager);
+    // Apply each region filter
+    for (const ele of ["AA21","AB20","AC20","AA30","ZR99"]) {
+      await this.searchAndSelectValue(ele, browserManager);
+    }
     
-  // Apply the filter
+    // Apply the filter
     await browserManager.waitForElement(CONFIG.selectors.filterApplyBtn);
     await browserManager.page.click(CONFIG.selectors.filterApplyBtn);
     const regionFilterStartTime = new Date();
     await this.waitForChartToLoad(browserManager);
     await browserManager.waitForAppLoader();
     console.log(`User ${userId}: Waiting for All API calls to complete`);
-    await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
+    await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 60000 });
     console.log(`User ${userId}: All API calls completed`);
     const regionFilterTime = (new Date() - regionFilterStartTime) / 1000;
     testResults.regionFilterTime = regionFilterTime;
@@ -634,32 +689,21 @@ class VizpadTestRunner {
   }
   
   
-  async performTerritoryFilterTest(userId, testResults, browserManager, randomTerritories) {
+  async performTerritoryFilterTest(userId, testResults, browserManager) {
     console.log(`User ${userId}: Starting territory filter test`);
-    // Get random territory data
-    console.log(`User ${userId}: Testing with territories: ${randomTerritories.join(', ')}`);
     
     try {
       console.log(`User ${userId}: Waiting for search input elements...`);
       await browserManager.waitForElement(CONFIG.selectors.searchInput);
       
-      // Use a more robust approach to click the third search input
+      // Use XPath to click the third search input (Territory filter)
       console.log(`User ${userId}: Attempting to click third search input...`);
-      await browserManager.page.evaluate(() => {
-        const searchInputs = document.querySelectorAll("[data-cy-id='cy-search-data']");
-        console.log(`Found ${searchInputs.length} search inputs`);
-        if (searchInputs.length >= 3) {
-          searchInputs[2].scrollIntoView();
-          searchInputs[2].click();
-          console.log("Successfully clicked third search input");
-        } else {
-          throw new Error(`Third search input not found. Only ${searchInputs.length} inputs available.`);
-        }
-      });
+      await this.clickElementByXPath(browserManager.page, CONFIG.selectors.territoryEle);
       
-      console.log(`User ${userId}: Selecting first 3 results...`);
       // Apply each territory filter
-      await this.selectFirstNResults(3, browserManager);
+      for (const ele of ["008A","010A","019A","021A","025A"]) {
+        await this.searchAndSelectValue(ele, browserManager);
+      }
       
       console.log(`User ${userId}: Applying filter...`);
       // Apply the filter
@@ -673,7 +717,7 @@ class VizpadTestRunner {
       await browserManager.waitForAppLoader();
 
       console.log(`User ${userId}: Waiting for All API calls to complete`);
-      await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 30000 });
+      await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 60000 });
       
       console.log(`User ${userId}: All API calls completed`);
       const territoryFilterTime = (new Date() - territoryFilterStartTime) / 1000;
@@ -852,25 +896,19 @@ class VizpadTestRunner {
     let csvContent = 'Script Time (s),Number of Users,Vizpad URL\n';
     csvContent += `${scriptRunTime},${numUsers},"${CONFIG.vizpadUrl}"\n\n`;
     
-    // Add headers
-    let headerRow = 'User ID,Vizpad Load (s),Chart Load (s)';
-    const tabIndexNum = parseInt(CONFIG.tabIndex);
-    if (CONFIG.tabIndex && CONFIG.tabIndex !== '' && CONFIG.tabIndex !== 'null' && CONFIG.tabIndex !== 'undefined' && !isNaN(tabIndexNum) && tabIndexNum > 0) {
-      headerRow += ',Tab Switch (s)';
-    }
-    headerRow += ',Area Filter (s),Region Filter (s),Territory Filter (s),Total Filter Test (s),Status,Error Message\n';
+    // Add headers with tab index information
+    let headerRow = 'User ID,Vizpad Load (s),Chart Load (s),Area Filter (s),Tab Switch 1 (s) - Tab Index,Tab Switch 2 (s) - Tab Index,Region Filter (s),Territory Filter (s),Tab Switch 3 (s) - Tab Index,Status,Error Message\n';
     csvContent += headerRow;
     
-    // Add data rows
+    // Add data rows with tab index information
     results.forEach(result => {
       let dataRow = `${result.userId || 0},${result.vizpadLoadTime || 0},${result.chartLoadTime || 0}`;
-      
-      const tabIndexNum = parseInt(CONFIG.tabIndex);
-      if (CONFIG.tabIndex && CONFIG.tabIndex !== '' && CONFIG.tabIndex !== 'null' && CONFIG.tabIndex !== 'undefined' && !isNaN(tabIndexNum) && tabIndexNum > 0) {
-        dataRow += `,${result.tabSwitchTime || 0}`;
-      }
-      
-      dataRow += `,${result.areaFilterTime || 0},${result.regionFilterTime || 0},${result.territoryFilterTime || 0},${result.TotalFilterTestTime || 0}`;
+      dataRow += `,${result.areaFilterTime || 0}`;
+      dataRow += `,${result.tabSwitchTime1 || 0} (Tab ${result.randomTab1 || 'N/A'})`;
+      dataRow += `,${result.tabSwitchTime2 || 0} (Tab ${result.randomTab2 || 'N/A'})`;
+      dataRow += `,${result.regionFilterTime || 0}`;
+      dataRow += `,${result.territoryFilterTime || 0}`;
+      dataRow += `,${result.tabSwitchTime3 || 0} (Tab ${result.randomTab3 || 'N/A'})`;
       
       // Add status and error message
       const status = result.success ? 'SUCCESS' : 'FAILED';
@@ -898,32 +936,34 @@ class VizpadTestRunner {
     // Display results in table format
     console.log('\n=== DETAILED RESULTS TABLE ===');
     
-    // Prepare table data
+    // Prepare table data with dynamic column names based on actual tab selections
     const tableData = results.map(result => {
       const status = result.success ? '✅ Success' : '❌ Failed';
       
       const row = {
         'User ID': result.userId,
         'Vizpad Load (s)': result.vizpadLoadTime.toFixed(2),
-        'Chart Load (s)': result.chartLoadTime.toFixed(2)
+        'Chart Load (s)': result.chartLoadTime.toFixed(2),
+        'Area Filter (s)': result.areaFilterTime.toFixed(2),
+        'Tab Switch 1 (s)': `${result.tabSwitchTime1.toFixed(2)} (Tab ${result.randomTab1 || 'N/A'})`,
+        'Tab Switch 2 (s)': `${result.tabSwitchTime2.toFixed(2)} (Tab ${result.randomTab2 || 'N/A'})`,
+        'Region Filter (s)': result.regionFilterTime.toFixed(2),
+        'Territory Filter (s)': result.territoryFilterTime.toFixed(2),
+        'Tab Switch 3 (s)': `${result.tabSwitchTime3.toFixed(2)} (Tab ${result.randomTab3 || 'N/A'})`,
+        'Status': status
       };
-      
-      const tabIndexNum = parseInt(CONFIG.tabIndex);
-      if (CONFIG.tabIndex && CONFIG.tabIndex !== '' && CONFIG.tabIndex !== 'null' && CONFIG.tabIndex !== 'undefined' && !isNaN(tabIndexNum) && tabIndexNum > 0 && result.tabSwitchTime !== undefined) {
-        row['Tab Switch (s)'] = result.tabSwitchTime.toFixed(2);
-      }
-      
-      row['Area Filter (s)'] = result.areaFilterTime.toFixed(2);
-      row['Region Filter (s)'] = result.regionFilterTime.toFixed(2);
-      row['Territory Filter (s)'] = result.territoryFilterTime.toFixed(2);
-      row['Total Filter Test (s)'] = result.TotalFilterTestTime.toFixed(2);
-      row['Status'] = status;
       
       return row;
     });
     
     // Display the table
     console.table(tableData);
+    
+    // Display random tab selection summary
+    console.log('\n=== RANDOM TAB SELECTION SUMMARY ===');
+    results.forEach(result => {
+      console.log(`User ${result.userId}: Random tabs selected - Tab 1: ${result.randomTab1 || 'N/A'}, Tab 2: ${result.randomTab2 || 'N/A'}, Tab 3: ${result.randomTab3 || 'N/A'}`);
+    });
     
     // Calculate and display averages
     const successfulResults = results.filter(r => r.success);
@@ -933,17 +973,12 @@ class VizpadTestRunner {
         'Average Vizpad Load (s)': (successfulResults.reduce((sum, r) => sum + r.vizpadLoadTime, 0) / successfulResults.length).toFixed(2),
         'Average Chart Load (s)': (successfulResults.reduce((sum, r) => sum + r.chartLoadTime, 0) / successfulResults.length).toFixed(2),
         'Average Area Filter (s)': (successfulResults.reduce((sum, r) => sum + r.areaFilterTime, 0) / successfulResults.length).toFixed(2),
+        'Average Tab Switch 1 (s)': (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime1, 0) / successfulResults.length).toFixed(2),
+        'Average Tab Switch 2 (s)': (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime2, 0) / successfulResults.length).toFixed(2),
         'Average Region Filter (s)': (successfulResults.reduce((sum, r) => sum + r.regionFilterTime, 0) / successfulResults.length).toFixed(2),
         'Average Territory Filter (s)': (successfulResults.reduce((sum, r) => sum + r.territoryFilterTime, 0) / successfulResults.length).toFixed(2),
-        'Average Total Filter Test (s)': (successfulResults.reduce((sum, r) => sum + r.TotalFilterTestTime, 0) / successfulResults.length).toFixed(2),
+        'Average Tab Switch 3 (s)': (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime3, 0) / successfulResults.length).toFixed(2),
       };
-      const tabIndexNum = parseInt(CONFIG.tabIndex);
-      if (CONFIG.tabIndex && CONFIG.tabIndex !== '' && CONFIG.tabIndex !== 'null' && CONFIG.tabIndex !== 'undefined' && !isNaN(tabIndexNum) && tabIndexNum > 0) {
-        const tabSwitchResults = successfulResults.filter(r => r.tabSwitchTime !== undefined);
-        if (tabSwitchResults.length > 0) {
-          averages['Average Tab Switch (s)'] = (tabSwitchResults.reduce((sum, r) => sum + r.tabSwitchTime, 0) / tabSwitchResults.length).toFixed(2);
-        }
-      }
       console.table(averages);
     }
     

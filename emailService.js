@@ -69,9 +69,11 @@ class EmailService {
         vizpadLoad: (successfulResults.reduce((sum, r) => sum + r.vizpadLoadTime, 0) / successfulResults.length).toFixed(2),
         chartLoad: (successfulResults.reduce((sum, r) => sum + r.chartLoadTime, 0) / successfulResults.length).toFixed(2),
         areaFilter: (successfulResults.reduce((sum, r) => sum + r.areaFilterTime, 0) / successfulResults.length).toFixed(2),
+        tabSwitch1: (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime1, 0) / successfulResults.length).toFixed(2),
+        tabSwitch2: (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime2, 0) / successfulResults.length).toFixed(2),
+        regionFilter: (successfulResults.reduce((sum, r) => sum + r.regionFilterTime, 0) / successfulResults.length).toFixed(2),
         territoryFilter: (successfulResults.reduce((sum, r) => sum + r.territoryFilterTime, 0) / successfulResults.length).toFixed(2),
-        timeFilter: (successfulResults.reduce((sum, r) => sum + r.timeFilterTime, 0) / successfulResults.length).toFixed(3),
-        totalFilterTest: (successfulResults.reduce((sum, r) => sum + r.TotalFilterTestTime, 0) / successfulResults.length).toFixed(2),
+        tabSwitch3: (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime3, 0) / successfulResults.length).toFixed(2),
       };
     }
 
@@ -132,16 +134,24 @@ class EmailService {
                 <td class="metric-value">${averages.areaFilter}</td>
             </tr>
             <tr>
+                <td>Tab Switch 1</td>
+                <td class="metric-value">${averages.tabSwitch1}</td>
+            </tr>
+            <tr>
+                <td>Tab Switch 2</td>
+                <td class="metric-value">${averages.tabSwitch2}</td>
+            </tr>
+            <tr>
+                <td>Region Filter</td>
+                <td class="metric-value">${averages.regionFilter}</td>
+            </tr>
+            <tr>
                 <td>Territory Filter</td>
                 <td class="metric-value">${averages.territoryFilter}</td>
             </tr>
             <tr>
-                <td>Time Filter</td>
-                <td class="metric-value">${averages.timeFilter}</td>
-            </tr>
-            <tr>
-                <td>Total Filter Test</td>
-                <td class="metric-value">${averages.totalFilterTest}</td>
+                <td>Tab Switch 3</td>
+                <td class="metric-value">${averages.tabSwitch3}</td>
             </tr>
         </table>
     </div>
@@ -155,9 +165,11 @@ class EmailService {
                 <th>Vizpad Load (s)</th>
                 <th>Chart Load (s)</th>
                 <th>Area Filter (s)</th>
+                <th>Tab Switch 1 (s) - Tab Index</th>
+                <th>Tab Switch 2 (s) - Tab Index</th>
+                <th>Region Filter (s)</th>
                 <th>Territory Filter (s)</th>
-                <th>Time Filter (s)</th>
-                <th>Total Filter Test (s)</th>
+                <th>Tab Switch 3 (s) - Tab Index</th>
                 <th>Status</th>
             </tr>
             ${results.map(result => `
@@ -166,9 +178,11 @@ class EmailService {
                 <td>${result.vizpadLoadTime ? result.vizpadLoadTime.toFixed(2) : 'N/A'}</td>
                 <td>${result.chartLoadTime ? result.chartLoadTime.toFixed(2) : 'N/A'}</td>
                 <td>${result.areaFilterTime ? result.areaFilterTime.toFixed(2) : 'N/A'}</td>
+                <td>${result.tabSwitchTime1 ? `${result.tabSwitchTime1.toFixed(2)} (Tab ${result.randomTab1 || 'N/A'})` : 'N/A'}</td>
+                <td>${result.tabSwitchTime2 ? `${result.tabSwitchTime2.toFixed(2)} (Tab ${result.randomTab2 || 'N/A'})` : 'N/A'}</td>
+                <td>${result.regionFilterTime ? result.regionFilterTime.toFixed(2) : 'N/A'}</td>
                 <td>${result.territoryFilterTime ? result.territoryFilterTime.toFixed(2) : 'N/A'}</td>
-                <td>${result.timeFilterTime ? result.timeFilterTime.toFixed(3) : 'N/A'}</td>
-                <td>${result.TotalFilterTestTime ? result.TotalFilterTestTime.toFixed(2) : 'N/A'}</td>
+                <td>${result.tabSwitchTime3 ? `${result.tabSwitchTime3.toFixed(2)} (Tab ${result.randomTab3 || 'N/A'})` : 'N/A'}</td>
                 <td class="${result.success ? 'success' : 'failed'}">${result.success ? '✅ Success' : '❌ Failed'}</td>
             </tr>
             `).join('')}
@@ -211,9 +225,11 @@ Average Performance Metrics:
 - Vizpad Load: ${averages.vizpadLoad} seconds
 - Chart Load: ${averages.chartLoad} seconds
 - Area Filter: ${averages.areaFilter} seconds
+- Tab Switch 1: ${averages.tabSwitch1} seconds
+- Tab Switch 2: ${averages.tabSwitch2} seconds
+- Region Filter: ${averages.regionFilter} seconds
 - Territory Filter: ${averages.territoryFilter} seconds
-- Time Filter: ${averages.timeFilter} seconds
-- Total Filter Test: ${averages.totalFilterTest} seconds
+- Tab Switch 3: ${averages.tabSwitch3} seconds
 ` : ''}
 
 Detailed Results:
@@ -222,9 +238,11 @@ User ${result.userId}:
   Vizpad Load: ${result.vizpadLoadTime ? result.vizpadLoadTime.toFixed(2) : 'N/A'}s
   Chart Load: ${result.chartLoadTime ? result.chartLoadTime.toFixed(2) : 'N/A'}s
   Area Filter: ${result.areaFilterTime ? result.areaFilterTime.toFixed(2) : 'N/A'}s
+  Tab Switch 1: ${result.tabSwitchTime1 ? `${result.tabSwitchTime1.toFixed(2)}s (Tab ${result.randomTab1 || 'N/A'})` : 'N/A'}
+  Tab Switch 2: ${result.tabSwitchTime2 ? `${result.tabSwitchTime2.toFixed(2)}s (Tab ${result.randomTab2 || 'N/A'})` : 'N/A'}
+  Region Filter: ${result.regionFilterTime ? result.regionFilterTime.toFixed(2) : 'N/A'}s
   Territory Filter: ${result.territoryFilterTime ? result.territoryFilterTime.toFixed(2) : 'N/A'}s
-  Time Filter: ${result.timeFilterTime ? result.timeFilterTime.toFixed(3) : 'N/A'}s
-  Total Filter Test: ${result.TotalFilterTestTime ? result.TotalFilterTestTime.toFixed(2) : 'N/A'}s
+  Tab Switch 3: ${result.tabSwitchTime3 ? `${result.tabSwitchTime3.toFixed(2)}s (Tab ${result.randomTab3 || 'N/A'})` : 'N/A'}
   Status: ${result.success ? 'SUCCESS' : 'FAILED'}
 `).join('')}
 
