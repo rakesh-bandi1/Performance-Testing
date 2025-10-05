@@ -286,7 +286,9 @@ class VizpadTestRunner {
       userId,
       vizpadLoadTime: 0,
       chartLoadTime: 0,
-      areaFilterTime: 0,
+      areaFilterTime1: 0,  // Step 2: Initial area filter
+      areaFilterTime2: 0,  // Step 3: Area filter after tab switch 1
+      areaFilterTime3: 0,  // Step 5: Area filter after tab switch 3
       tabSwitchTime1: 0,
       tabSwitchTime2: 0,
       regionFilterTime: 0,
@@ -308,43 +310,49 @@ class VizpadTestRunner {
       await this.performVizpadTest(userId, testResults, browserManager);
       
       // Step 2: Apply Area filter and wait for all charts to load
-      console.log(`User ${userId}: Step 2 - Applying Area filter`);
-      await this.performAreaFilterTest(userId, testResults, browserManager);
+      // console.log(`User ${userId}: Step 2 - Applying Area filter`);
+      // await this.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime1');
       
       // Step 3: Switch to a random tab and wait for all charts to load
-      const availableTabs = [1, 2, 3, 4];
-      const randomTab1 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      testResults.randomTab1 = randomTab1;
-      console.log(`User ${userId}: Step 3 - Switching to random Tab ${randomTab1}`);
-      await this.performTabSwitch(userId, testResults, browserManager, randomTab1, 'tabSwitchTime1');
-      
+      // const availableTabs = [1, 2, 3, 4];
+      // const randomTab1 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      // testResults.randomTab1 = randomTab1;
+      // console.log(`User ${userId}: Step 3 - Switching to random Tab ${randomTab1}`);
+      await this.performTabSwitch(userId, testResults, browserManager, 2, 'tabSwitchTime1');
+      // await this.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime2');
+
+
       // Step 4: Switch to another random tab and wait for all charts to load
-      let randomTab2 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      // Ensure we don't select the same tab as the previous one
-      while (randomTab2 === randomTab1) {
-        randomTab2 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      }
-      testResults.randomTab2 = randomTab2;
-      console.log(`User ${userId}: Step 4 - Switching to random Tab ${randomTab2}`);
-      await this.performTabSwitch(userId, testResults, browserManager, randomTab2, 'tabSwitchTime2');
+      // let randomTab2 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      // // Ensure we don't select the same tab as the previous one
+      // while (randomTab2 === randomTab1) {
+      //   randomTab2 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      // }
+      // testResults.randomTab2 = randomTab2;
+      // console.log(`User ${userId}: Step 4 - Switching to random Tab ${randomTab2}`);
+      await this.performTabSwitch(userId, testResults, browserManager, 3, 'tabSwitchTime2');
       
       // Step 5: Apply Region filter and wait for all charts to load
       console.log(`User ${userId}: Step 5 - Applying Region filter`);
-      await this.performRegionFilterTest(userId, testResults, browserManager);
+      // await this.performRegionFilterTest(userId, testResults, browserManager);
       
-      // Step 6: Apply Territory filter and wait for all charts to load
-      console.log(`User ${userId}: Step 6 - Applying Territory filter`);
-      await this.performTerritoryFilterTest(userId, testResults, browserManager);
+      // // Step 6: Apply Territory filter and wait for all charts to load
+      // console.log(`User ${userId}: Step 6 - Applying Territory filter`);
+      // await this.performTerritoryFilterTest(userId, testResults, browserManager);
       
       // Step 7: Switch to yet another random tab and wait for all charts to load
-      let randomTab3 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      // Ensure we don't select the same tab as the previous ones
-      while (randomTab3 === randomTab1 || randomTab3 === randomTab2) {
-        randomTab3 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      }
-      testResults.randomTab3 = randomTab3;
-      console.log(`User ${userId}: Step 7 - Switching to random Tab ${randomTab3}`);
-      await this.performTabSwitch(userId, testResults, browserManager, randomTab3, 'tabSwitchTime3');
+      // let randomTab3 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      // // Ensure we don't select the same tab as the previous ones
+      // while (randomTab3 === randomTab1 || randomTab3 === randomTab2) {
+      //   randomTab3 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
+      // }
+      // testResults.randomTab3 = randomTab3;
+      // console.log(`User ${userId}: Step 7 - Switching to random Tab ${randomTab3}`);
+      await this.performTabSwitch(userId, testResults, browserManager, 4, 'tabSwitchTime3');
+      
+      // Step 5: Apply Area filter and wait for all charts to load
+      // console.log(`User ${userId}: Step 5 - Applying Area filter`);
+      // await this.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime3');
 
     } catch (error) {
       testResults.success = false;
@@ -479,32 +487,64 @@ class VizpadTestRunner {
       timeout: CONFIG.timeouts.longNavigation,
     });
     
-    // Wait for both APIs concurrently
+    // Wait for APIs with detailed logging
     console.log(`User ${userId}: Waiting for APIs...`);
     
-    await Promise.all([
-      browserManager.page.waitForResponse(
-        response => response.url().includes('/vizpadView') && response.request().method() === 'GET',
-        { timeout: CONFIG.timeouts.navigation }
-      ),
-      browserManager.page.waitForResponse(
-        response => response.url().includes('/vizItem') && response.request().method() === 'GET',
-        { timeout: CONFIG.timeouts.navigation }
-      ),
-      browserManager.page.waitForResponse(
-        response => response.url().includes('/businessViews') && response.request().method() === 'GET',
-        { timeout: CONFIG.timeouts.navigation }
-      ),
-      browserManager.page.waitForResponse(
-        response => response.url().includes('/auth/runtimeConfig') && response.request().method() === 'GET',
-        { timeout: CONFIG.timeouts.navigation }
-      )
-    ]).then(() => {
-      console.log(`User ${userId}: APIs Load completed`);
-    }).catch((error) => {
-      console.log(`User ${userId}: APIs Load failed: ${error}`);
-      throw new Error(error);
-    });
+    const apiPromises = [
+      {
+        name: 'vizpadView',
+        promise: browserManager.page.waitForResponse(
+          response => response.url().includes('/vizpadView') && response.request().method() === 'GET',
+          { timeout: CONFIG.timeouts.navigation }
+        )
+      },
+      {
+        name: 'vizItem',
+        promise: browserManager.page.waitForResponse(
+          response => response.url().includes('/vizItem') && response.request().method() === 'GET',
+          { timeout: CONFIG.timeouts.navigation }
+        )
+      },
+      {
+        name: 'businessViews',
+        promise: browserManager.page.waitForResponse(
+          response => response.url().includes('/businessViews') && response.request().method() === 'GET',
+          { timeout: CONFIG.timeouts.navigation }
+        )
+      },
+      {
+        name: 'auth/runtimeConfig',
+        promise: browserManager.page.waitForResponse(
+          response => response.url().includes('/auth/runtimeConfig') && response.request().method() === 'GET',
+          { timeout: CONFIG.timeouts.navigation }
+        )
+      }
+    ];
+
+    // Track each API individually
+    const apiResults = [];
+    const startTime = Date.now();
+    
+    for (const api of apiPromises) {
+      console.log(`User ${userId}: Starting to wait for ${api.name} API...`);
+      const apiStartTime = Date.now();
+      
+      try {
+        await api.promise;
+        const apiDuration = Date.now() - apiStartTime;
+        console.log(`User ${userId}: ✅ ${api.name} API completed in ${apiDuration}ms`);
+        apiResults.push({ name: api.name, success: true, duration: apiDuration });
+      } catch (error) {
+        const apiDuration = Date.now() - apiStartTime;
+        console.log(`User ${userId}: ❌ ${api.name} API failed after ${apiDuration}ms: ${error.message}`);
+        apiResults.push({ name: api.name, success: false, duration: apiDuration, error: error.message });
+        throw new Error(`API ${api.name} failed: ${error.message}`);
+      }
+    }
+    
+    const totalApiTime = Date.now() - startTime;
+    console.log(`User ${userId}: All APIs completed in ${totalApiTime}ms`);
+    console.log(`User ${userId}: API Results:`, apiResults);
     
     // Calculate total vizpad load time (time for both APIs to complete)
     const vizpadLoadTime = (new Date() - testStartTime) / 1000;
@@ -564,7 +604,7 @@ class VizpadTestRunner {
       this.metrics.addMetric(userId, 'TotalFilterTestTime', TotalFilterTestTime);
       console.log(`User ${userId}: Filter test completed in ${TotalFilterTestTime}s`);
   }
-  async performAreaFilterTest(userId, testResults, browserManager) {
+  async performAreaFilterTest(userId, testResults, browserManager, timeField = 'areaFilterTime1') {
       console.log(`User ${userId}: Starting area filter test`);
       
       await browserManager.waitForElement(CONFIG.selectors.searchInput);
@@ -586,8 +626,8 @@ class VizpadTestRunner {
       await browserManager.page.waitForNetworkIdle({ idleTime: 500, timeout: 60000 });
       console.log(`User ${userId}: All API calls completed`);
       const areaFilterTime = (new Date() - areaFilterStartTime) / 1000;
-      testResults.areaFilterTime = areaFilterTime;
-      this.metrics.addMetric(userId, 'areaFilterTime', areaFilterTime);
+      testResults[timeField] = areaFilterTime;
+      this.metrics.addMetric(userId, timeField, areaFilterTime);
       console.log(`User ${userId}: Area filter completed in ${areaFilterTime}s`);
   }
   async performRegionFilterTest(userId, testResults, browserManager) {
@@ -897,18 +937,20 @@ class VizpadTestRunner {
     csvContent += `${scriptRunTime},${numUsers},"${CONFIG.vizpadUrl}"\n\n`;
     
     // Add headers with tab index information
-    let headerRow = 'User ID,Vizpad Load (s),Chart Load (s),Area Filter (s),Tab Switch 1 (s) - Tab Index,Tab Switch 2 (s) - Tab Index,Region Filter (s),Territory Filter (s),Tab Switch 3 (s) - Tab Index,Status,Error Message\n';
+    let headerRow = 'User ID,Vizpad Load (s),Chart Load (s),Area Filter 1 (s),Tab Switch 1 (s) - Tab Index,Area Filter 2 (s),Tab Switch 2 (s) - Tab Index,Region Filter (s),Territory Filter (s),Tab Switch 3 (s) - Tab Index,Area Filter 3 (s),Status,Error Message\n';
     csvContent += headerRow;
     
     // Add data rows with tab index information
     results.forEach(result => {
       let dataRow = `${result.userId || 0},${result.vizpadLoadTime || 0},${result.chartLoadTime || 0}`;
-      dataRow += `,${result.areaFilterTime || 0}`;
-      dataRow += `,${result.tabSwitchTime1 || 0} (Tab ${result.randomTab1 || 'N/A'})`;
-      dataRow += `,${result.tabSwitchTime2 || 0} (Tab ${result.randomTab2 || 'N/A'})`;
+      dataRow += `,${result.areaFilterTime1 || 0}`;
+      dataRow += `,${result.tabSwitchTime1 || 0}`;
+      dataRow += `,${result.areaFilterTime2 || 0}`;
+      dataRow += `,${result.tabSwitchTime2 || 0}`;
       dataRow += `,${result.regionFilterTime || 0}`;
       dataRow += `,${result.territoryFilterTime || 0}`;
-      dataRow += `,${result.tabSwitchTime3 || 0} (Tab ${result.randomTab3 || 'N/A'})`;
+      dataRow += `,${result.tabSwitchTime3 || 0}`;
+      dataRow += `,${result.areaFilterTime3 || 0}`;
       
       // Add status and error message
       const status = result.success ? 'SUCCESS' : 'FAILED';
@@ -944,12 +986,14 @@ class VizpadTestRunner {
         'User ID': result.userId,
         'Vizpad Load (s)': result.vizpadLoadTime.toFixed(2),
         'Chart Load (s)': result.chartLoadTime.toFixed(2),
-        'Area Filter (s)': result.areaFilterTime.toFixed(2),
+        // 'Area Filter 1 (s)': result.areaFilterTime1.toFixed(2),
         'Tab Switch 1 (s)': `${result.tabSwitchTime1.toFixed(2)} (Tab ${result.randomTab1 || 'N/A'})`,
+        // 'Area Filter 2 (s)': result.areaFilterTime2.toFixed(2),
         'Tab Switch 2 (s)': `${result.tabSwitchTime2.toFixed(2)} (Tab ${result.randomTab2 || 'N/A'})`,
-        'Region Filter (s)': result.regionFilterTime.toFixed(2),
-        'Territory Filter (s)': result.territoryFilterTime.toFixed(2),
+        // 'Region Filter (s)': result.regionFilterTime.toFixed(2),
+        // 'Territory Filter (s)': result.territoryFilterTime.toFixed(2),
         'Tab Switch 3 (s)': `${result.tabSwitchTime3.toFixed(2)} (Tab ${result.randomTab3 || 'N/A'})`,
+        // 'Area Filter 3 (s)': result.areaFilterTime3.toFixed(2),
         'Status': status
       };
       
@@ -972,12 +1016,14 @@ class VizpadTestRunner {
       const averages = {
         'Average Vizpad Load (s)': (successfulResults.reduce((sum, r) => sum + r.vizpadLoadTime, 0) / successfulResults.length).toFixed(2),
         'Average Chart Load (s)': (successfulResults.reduce((sum, r) => sum + r.chartLoadTime, 0) / successfulResults.length).toFixed(2),
-        'Average Area Filter (s)': (successfulResults.reduce((sum, r) => sum + r.areaFilterTime, 0) / successfulResults.length).toFixed(2),
+        // 'Average Area Filter 1 (s)': (successfulResults.reduce((sum, r) => sum + r.areaFilterTime1, 0) / successfulResults.length).toFixed(2),
         'Average Tab Switch 1 (s)': (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime1, 0) / successfulResults.length).toFixed(2),
+        // 'Average Area Filter 2 (s)': (successfulResults.reduce((sum, r) => sum + r.areaFilterTime2, 0) / successfulResults.length).toFixed(2),
         'Average Tab Switch 2 (s)': (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime2, 0) / successfulResults.length).toFixed(2),
-        'Average Region Filter (s)': (successfulResults.reduce((sum, r) => sum + r.regionFilterTime, 0) / successfulResults.length).toFixed(2),
-        'Average Territory Filter (s)': (successfulResults.reduce((sum, r) => sum + r.territoryFilterTime, 0) / successfulResults.length).toFixed(2),
+        // 'Average Region Filter (s)': (successfulResults.reduce((sum, r) => sum + r.regionFilterTime, 0) / successfulResults.length).toFixed(2),
+        // 'Average Territory Filter (s)': (successfulResults.reduce((sum, r) => sum + r.territoryFilterTime, 0) / successfulResults.length).toFixed(2),
         'Average Tab Switch 3 (s)': (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime3, 0) / successfulResults.length).toFixed(2),
+        // 'Average Area Filter 3 (s)': (successfulResults.reduce((sum, r) => sum + r.areaFilterTime3, 0) / successfulResults.length).toFixed(2),
       };
       console.table(averages);
     }
