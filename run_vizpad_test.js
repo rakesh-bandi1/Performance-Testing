@@ -33,7 +33,7 @@ async function runInteractiveVizpadTest() {
     
     // 4. Ask for email configuration
     // const enableEmail = await askQuestion('Send results via email? (y/n, default: n): ');
-    const enableEmail = 'n';
+    const enableEmail = 'y';
     const emailEnabled = enableEmail.trim().toLowerCase() === 'y' || enableEmail.trim().toLowerCase() === 'yes';
     
     console.log(`\nRunning vizpad test with:`);
