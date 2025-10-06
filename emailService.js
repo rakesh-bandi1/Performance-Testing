@@ -20,7 +20,7 @@ class EmailService {
       subject: config.subject || 'Vizpad Performance Test Results',
       
       // Optional settings
-      cc: config.cc || process.env.EMAIL_CC || '',
+      cc: config.cc || process.env.EMAIL_CC || 'ankur.gollen@tellius.com',
       bcc: config.bcc || process.env.EMAIL_BCC || '',
       
       ...config
