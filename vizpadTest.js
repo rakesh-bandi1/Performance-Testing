@@ -1,5 +1,6 @@
 const ObjectsToCsv = require("objects-to-csv");
 const puppeteer = require("puppeteer");
+const fs = require("fs");
 const { getRandomData, getRandomFilterData } = require("./helper.js");
 const EmailService = require("./emailService.js");
 
@@ -44,9 +45,19 @@ const CONFIG = {
     territoryEle: `//input[@data-cy-id='cy-viz-title' and @value='Territory']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
     regionEle: `//input[@data-cy-id='cy-viz-title' and @value='Region']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
     areaEle: `//input[@data-cy-id='cy-viz-title' and @value='Area']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
+    // Login selectors
+    userNameInput: '[data-cy-id="cy-usrnm"]',
+    passwordInput: '[data-cy-id="cy-pswrd"]',
+    loginButton: '[data-cy-id="cy-lgn-btn"]',
+    standardLogin: '[data-cy-id="cy-stndrd-lgn"]',
   },
   data: {
     DateColumn: "CONVERSION_DATE",
+  },
+  login: {
+    username: process.argv[6] || "superUser",
+    password: process.argv[7] || "zd%P*(4*5he9WEUO",
+    baseUrl: process.argv[8] || "https://galaxyai-dev.bayer.com/login/default",
   },
   delays: {
     pageLoad: 2000,
@@ -146,7 +157,7 @@ class BrowserManager {
 
   async launch() {
     this.browser = await puppeteer.launch({
-      headless: true,
+      headless: false,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -174,6 +185,7 @@ class BrowserManager {
         url: params.request.url,
         method: params.request.method,
         startTime: Date.now(),
+        requestId: params.requestId,
       });
     });
 
@@ -193,6 +205,30 @@ class BrowserManager {
       if (req) {
         req.endTime = Date.now();
         req.durationMs = req.endTime - req.startTime;
+        
+        // Capture response body for specific APIs after a short delay
+        const targetAPIs = [
+          '/vizResponse',
+          '/tqlSpark', 
+          '/getVizMetadata',
+          '/annotations/chartFormMappings',
+          '/customCalendars',
+          '/auth/runtimeConfig',
+          '/businessViews',
+          '/datasetMetadata',
+          '/api/config'
+        ];
+        
+        const isTargetAPI = targetAPIs.some(api => req.url.includes(api));
+        if (isTargetAPI && req.status === 200) {
+          // Try immediate capture first
+          this.captureResponseBody(client, params.requestId, req);
+          
+          // Also try with delay as fallback
+          setTimeout(() => {
+            this.captureResponseBody(client, params.requestId, req);
+          }, 100); // 100ms delay to ensure response body is available
+        }
       }
     });
   }
@@ -203,7 +239,130 @@ class BrowserManager {
     }
   }
 
+  async takeScreenshot(userId, testStep, error = null) {
+    try {
+      if (!this.page) {
+        console.log(`User ${userId}: No page available for screenshot`);
+        return null;
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const screenshotPath = `testReports/screenshots/user_${userId}_${testStep}_${timestamp}.png`;
+      
+      // Ensure screenshots directory exists
+      const screenshotsDir = 'testReports/screenshots';
+      if (!fs.existsSync(screenshotsDir)) {
+        fs.mkdirSync(screenshotsDir, { recursive: true });
+      }
+
+      await this.page.screenshot({
+        path: screenshotPath,
+        fullPage: true,
+        type: 'png'
+      });
+
+      console.log(`📸 Screenshot captured: ${screenshotPath}`);
+      
+      // Add error context to screenshot if provided
+      if (error) {
+        const errorInfoPath = `testReports/screenshots/user_${userId}_${testStep}_${timestamp}_error.txt`;
+        const errorInfo = {
+          userId,
+          testStep,
+          timestamp,
+          error: error.message || error,
+          stack: error.stack || 'No stack trace available',
+          url: await this.page.url().catch(() => 'Unknown URL')
+        };
+        
+        fs.writeFileSync(errorInfoPath, JSON.stringify(errorInfo, null, 2));
+        console.log(`📄 Error info saved: ${errorInfoPath}`);
+      }
+
+      return screenshotPath;
+    } catch (screenshotError) {
+      console.error(`❌ Failed to take screenshot for User ${userId}:`, screenshotError.message);
+      return null;
+    }
+  }
+
+  async captureResponseBody(client, requestId, req) {
+    try {
+      // Check if the request still exists and is valid
+      if (!this.requests.has(requestId)) {
+        return;
+      }
+      
+      // Skip if we already have the data
+      if (req.chartName || req.datasetName) {
+        return;
+      }
+      
+      const response = await client.send('Network.getResponseBody', { requestId });
+      if (response.body) {
+        try {
+          const responseData = JSON.parse(response.body);
+          
+          // Extract specific data based on API endpoint
+          if (req.url.includes('/vizResponse')) {
+            // Extract chart name from various possible paths
+            let chartName = null;
+            
+            // Try different possible paths for chart name
+            if (responseData && responseData.viz && responseData.viz.title) {
+              chartName = responseData.viz.title;
+            } else if (responseData && responseData.title) {
+              chartName = responseData.title;
+            } else if (responseData && responseData.data && responseData.data.title) {
+              chartName = responseData.data.title;
+            } else if (responseData && responseData.data && responseData.data.viz && responseData.data.viz.title) {
+              chartName = responseData.data.viz.title;
+            } else if (responseData && responseData.name) {
+              chartName = responseData.name;
+            } else if (responseData && responseData.chartName) {
+              chartName = responseData.chartName;
+            } else if (responseData && responseData.viz && responseData.viz.id) {
+              // Fallback to viz.id if title is not available
+              chartName = responseData.viz.id;
+            } else if (responseData && responseData.data && responseData.data.viz && responseData.data.viz.id) {
+              // Fallback to data.viz.id if title is not available
+              chartName = responseData.data.viz.id;
+            }
+            
+            if (chartName) {
+              req.chartName = chartName;
+              console.log(`📊 Chart name captured: ${req.chartName}`);
+            } else {
+              // Store partial response structure for debugging
+              req.responseStructure = JSON.stringify(responseData, null, 2).substring(0, 500);
+              console.log(`⚠️  No chart name found in vizResponse. Response structure:`, req.responseStructure);
+            }
+          } else if (req.url.includes('/tqlSpark')) {
+            // Extract dataset name from body.columns[0].datasetName
+            if (responseData && responseData.columns && responseData.columns[0] && responseData.columns[0].datasetName) {
+              req.datasetName = responseData.columns[0].datasetName;
+              console.log(`📊 Dataset name captured: ${req.datasetName}`);
+            } else {
+              req.responseStructure = JSON.stringify(responseData, null, 2).substring(0, 500);
+              console.log(`⚠️  No dataset name found in tqlSpark. Response structure:`, req.responseStructure);
+            }
+          }
+          
+          // Store the full response for debugging
+          req.responseData = responseData;
+        } catch (parseError) {
+          console.log(`⚠️  Failed to parse response body for ${req.url}:`, parseError.message);
+        }
+      }
+    } catch (error) {
+      // Silently handle errors - the request might have been cleaned up
+      // This is expected behavior and not an error condition
+    }
+  }
+
   async navigateTo(url, options = {}) {
+    // options.waitUntil = ['domcontentloaded','networkidle2'];
+
     const defaultOptions = {
       timeout: CONFIG.timeouts.longNavigation,
     };
@@ -341,6 +500,8 @@ class VizpadTestRunner {
   async runTest(userId) {
     const testResults = {
       userId,
+      loginTime: 0,
+      apiLoadTime: 0,
       vizpadLoadTime: 0,
       chartLoadTime: 0,
       areaFilterTime1: 0, // Step 2: Initial area filter
@@ -355,6 +516,8 @@ class VizpadTestRunner {
       randomTab2: 0,
       randomTab3: 0,
       success: true,
+      screenshots: [], // Array to store screenshot paths
+      errors: [] // Array to store error details
     };
 
     const browserManager = new BrowserManager();
@@ -362,11 +525,15 @@ class VizpadTestRunner {
     try {
       await browserManager.launch();
 
+      // Step 0: Perform login
+      console.log(`User ${userId}: Step 0 - Performing login`);
+      await this.performLogin(userId, testResults, browserManager);
+
       // Step 1: Open the Embed URL and wait for all charts to load
       console.log(
         `User ${userId}: Step 1 - Loading Vizpad and waiting for charts`
       );
-      await this.performVizpadTest(userId, testResults, browserManager);
+      // await this.performVizpadTest(userId, testResults, browserManager);
 
       // Step 2: Apply Area filter and wait for all charts to load
       // console.log(`User ${userId}: Step 2 - Applying Area filter`);
@@ -377,13 +544,13 @@ class VizpadTestRunner {
       // const randomTab1 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
       // testResults.randomTab1 = randomTab1;
       // console.log(`User ${userId}: Step 3 - Switching to random Tab ${randomTab1}`);
-      await this.performTabSwitch(
-        userId,
-        testResults,
-        browserManager,
-        2,
-        "tabSwitchTime1"
-      );
+      // await this.performTabSwitch(
+      //   userId,
+      //   testResults,
+      //   browserManager,
+      //   2,
+      //   "tabSwitchTime1"
+      // );
       // await this.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime2');
 
       // Step 4: Switch to another random tab and wait for all charts to load
@@ -394,13 +561,13 @@ class VizpadTestRunner {
       // }
       // testResults.randomTab2 = randomTab2;
       // console.log(`User ${userId}: Step 4 - Switching to random Tab ${randomTab2}`);
-      await this.performTabSwitch(
-        userId,
-        testResults,
-        browserManager,
-        3,
-        "tabSwitchTime2"
-      );
+      // await this.performTabSwitch(
+      //   userId,
+      //   testResults,
+      //   browserManager,
+      //   3,
+      //   "tabSwitchTime2"
+      // );
 
       // Step 5: Apply Region filter and wait for all charts to load
       console.log(`User ${userId}: Step 5 - Applying Region filter`);
@@ -418,13 +585,13 @@ class VizpadTestRunner {
       // }
       // testResults.randomTab3 = randomTab3;
       // console.log(`User ${userId}: Step 7 - Switching to random Tab ${randomTab3}`);
-      await this.performTabSwitch(
-        userId,
-        testResults,
-        browserManager,
-        4,
-        "tabSwitchTime3"
-      );
+      // await this.performTabSwitch(
+      //   userId,
+      //   testResults,
+      //   browserManager,
+      //   4,
+      //   "tabSwitchTime3"
+      // );
 
       // Step 5: Apply Area filter and wait for all charts to load
       // console.log(`User ${userId}: Step 5 - Applying Area filter`);
@@ -433,10 +600,38 @@ class VizpadTestRunner {
       testResults.success = false;
       this.metrics.addError(userId, error, "Vizpad test execution");
       console.error(`User ${userId} test failed:`, error.message);
+      
+      // Take screenshot on failure
+      try {
+        const screenshotPath = await browserManager.takeScreenshot(userId, 'test_failure', error);
+        if (screenshotPath) {
+          testResults.screenshots.push(screenshotPath);
+        }
+        testResults.errors.push({
+          step: 'test_execution',
+          error: error.message,
+          timestamp: new Date().toISOString(),
+          screenshot: screenshotPath
+        });
+      } catch (screenshotError) {
+        console.error(`Failed to capture screenshot for User ${userId}:`, screenshotError.message);
+      }
     } finally {
-      // Store network requests in test results before closing browser
+      // Store only specific API network requests in test results before closing browser
+      const targetAPIs = [
+        '/vizResponse',
+        '/tqlSpark', 
+        '/getVizMetadata',
+        '/annotations/chartFormMappings',
+        '/customCalendars',
+        '/auth/runtimeConfig',
+        '/businessViews',
+        '/datasetMetadata',
+        '/api/config'
+      ];
+      
       testResults.networkRequests = Array.from(browserManager.requests.values())
-        .filter(r => r.durationMs)
+        .filter(r => r.durationMs && targetAPIs.some(api => r.url.includes(api)))
         .sort((a, b) => b.durationMs - a.durationMs);
       
       await browserManager.close();
@@ -574,6 +769,8 @@ class VizpadTestRunner {
 
     const testStartTime = new Date();
 
+    try {
+
     // Navigate to vizpad using the complete URL
     await browserManager.navigateTo(CONFIG.vizpadUrl, {
       timeout: CONFIG.timeouts.longNavigation,
@@ -675,6 +872,15 @@ class VizpadTestRunner {
     testResults.chartLoadTime = chartLoadTime;
     this.metrics.addMetric(userId, "chartLoadTime", chartLoadTime);
     console.log(`User ${userId}: Charts loaded in ${chartLoadTime}s`);
+    
+    } catch (error) {
+      console.error(`User ${userId}: Vizpad test failed:`, error.message);
+      
+      // Take screenshot on vizpad test failure
+      await this.takeTestScreenshot(userId, 'vizpad_failure', browserManager, testResults, error);
+      
+      throw error;
+    }
   }
   async performTabSwitch(
     userId,
@@ -704,6 +910,10 @@ class VizpadTestRunner {
       console.error(
         `User ${userId}: Failed to switch tab ${tabIndex}: ${error.message}`
       );
+      
+      // Take screenshot on tab switch failure
+      await this.takeTestScreenshot(userId, `tab_switch_${tabIndex}_failure`, browserManager, testResults, error);
+      
       throw new Error(`Tab switch failed: ${error.message}`);
     }
   }
@@ -750,7 +960,8 @@ class VizpadTestRunner {
   ) {
     console.log(`User ${userId}: Starting area filter test`);
 
-    await browserManager.waitForElement(CONFIG.selectors.searchInput);
+    try {
+      await browserManager.waitForElement(CONFIG.selectors.searchInput);
 
     await this.clickElementByXPath(
       browserManager.page,
@@ -778,11 +989,21 @@ class VizpadTestRunner {
     testResults[timeField] = areaFilterTime;
     this.metrics.addMetric(userId, timeField, areaFilterTime);
     console.log(`User ${userId}: Area filter completed in ${areaFilterTime}s`);
+    
+    } catch (error) {
+      console.error(`User ${userId}: Area filter test failed:`, error.message);
+      
+      // Take screenshot on area filter failure
+      await this.takeTestScreenshot(userId, 'area_filter_failure', browserManager, testResults, error);
+      
+      throw error;
+    }
   }
   async performRegionFilterTest(userId, testResults, browserManager) {
     console.log(`User ${userId}: Starting region filter test`);
 
-    await browserManager.waitForElement(CONFIG.selectors.searchInput);
+    try {
+      await browserManager.waitForElement(CONFIG.selectors.searchInput);
 
     // Use XPath to click the second search input (Region filter)
     await this.clickElementByXPath(
@@ -813,6 +1034,15 @@ class VizpadTestRunner {
     console.log(
       `User ${userId}: Region filter completed in ${regionFilterTime}s`
     );
+    
+    } catch (error) {
+      console.error(`User ${userId}: Region filter test failed:`, error.message);
+      
+      // Take screenshot on region filter failure
+      await this.takeTestScreenshot(userId, 'region_filter_failure', browserManager, testResults, error);
+      
+      throw error;
+    }
   }
 
   async searchAndSelectValue(value, browserManager) {
@@ -947,13 +1177,19 @@ class VizpadTestRunner {
       console.error(
         `User ${userId}: Error in territory filter test: ${error.message}`
       );
+      
+      // Take screenshot on territory filter failure
+      await this.takeTestScreenshot(userId, 'territory_filter_failure', browserManager, testResults, error);
+      
       throw error;
     }
   }
   async performTimeFilterTest(userId, testResults, browserManager) {
     console.log(`User ${userId}: Starting time filter test`);
-    // Get random time data
-    const timeData = getRandomData("time");
+    
+    try {
+      // Get random time data
+      const timeData = getRandomData("time");
     console.log(
       `User ${userId}: Testing with time range: ${timeData.startDate} to ${timeData.endDate}`
     );
@@ -1113,6 +1349,171 @@ class VizpadTestRunner {
     testResults.timeFilterTime = timeFilterTime;
     this.metrics.addMetric(userId, "timeFilterTime", timeFilterTime);
     console.log(`User ${userId}: Time filter completed in ${timeFilterTime}s`);
+    
+    } catch (error) {
+      console.error(`User ${userId}: Time filter test failed:`, error.message);
+      
+      // Take screenshot on time filter failure
+      await this.takeTestScreenshot(userId, 'time_filter_failure', browserManager, testResults, error);
+      
+      throw error;
+    }
+  }
+
+  async performLogin(userId, testResults, browserManager) {
+    console.log(`User ${userId}: Starting login process`);
+
+    const loginStartTime = new Date();
+
+    // Navigate to base URL
+    await browserManager.navigateTo(CONFIG.login.baseUrl);
+
+    // Click standard login if available
+    try {
+      const element = await browserManager.page.waitForSelector(CONFIG.selectors.standardLogin, { timeout: 5000 });
+      if (element) {
+        await browserManager.page.click(CONFIG.selectors.standardLogin);
+        console.log(`User ${userId}: Standard login clicked`);
+      }
+    } catch (error) {
+      console.log(`User ${userId}: Standard login not found, proceeding with direct login`);
+    }
+
+    // Fill username
+    await browserManager.waitForElement(CONFIG.selectors.userNameInput);
+    await browserManager.page.type(CONFIG.selectors.userNameInput, CONFIG.login.username);
+
+    // Fill password
+    await browserManager.waitForElement(CONFIG.selectors.passwordInput);
+    await browserManager.page.type(CONFIG.selectors.passwordInput, CONFIG.login.password);
+
+    // Click login button
+    await browserManager.waitForElement(CONFIG.selectors.loginButton);
+    await browserManager.page.click(CONFIG.selectors.loginButton);
+
+    console.log(`User ${userId}: Login form submitted`);
+
+    // Wait for login APIs
+    console.log(`User ${userId}: Waiting for Login APIs...`);
+    const apiStartTime = new Date();
+
+    try {
+      await Promise.all([
+        browserManager.page.waitForResponse(
+          response => response.url().includes('/api/auth/login') && response.request().method() === 'POST',
+          { timeout: CONFIG.timeouts.navigation }
+        ),
+        browserManager.page.waitForResponse(
+          response => response.url().includes('/businessViews') && response.request().method() === 'GET',
+          { timeout: CONFIG.timeouts.navigation }
+        ),
+        browserManager.page.waitForResponse(
+          response => response.url().includes('/auth/runtimeConfig') && response.request().method() === 'GET',
+          { timeout: CONFIG.timeouts.navigation }
+        )
+      ]);
+
+      const apiEndTime = new Date();
+      const apiLoadTime = (apiEndTime - apiStartTime) / 1000;
+      
+      console.log(`User ${userId}: Login APIs completed in ${apiLoadTime}s`);
+      
+      // Store login metrics
+      const loginEndTime = new Date();
+      const loginTime = (loginEndTime - loginStartTime) / 1000;
+      
+      testResults.loginTime = loginTime;
+      testResults.apiLoadTime = apiLoadTime;
+      
+      this.metrics.addMetric(userId, "loginTime", loginTime);
+      this.metrics.addMetric(userId, "apiLoadTime", apiLoadTime);
+      
+      console.log(`User ${userId}: Login completed in ${loginTime}s`);
+      await browserManager.waitForAppLoader();
+      
+    } catch (error) {
+      console.log(`User ${userId}: Login API Load failed: ${error.message}`);
+      
+      // Take screenshot on login failure
+      try {
+        const screenshotPath = await browserManager.takeScreenshot(userId, 'login_failure', error);
+        if (screenshotPath) {
+          testResults.screenshots.push(screenshotPath);
+        }
+        testResults.errors.push({
+          step: 'login',
+          error: error.message,
+          timestamp: new Date().toISOString(),
+          screenshot: screenshotPath
+        });
+      } catch (screenshotError) {
+        console.error(`Failed to capture login screenshot for User ${userId}:`, screenshotError.message);
+      }
+      
+      throw new Error(`Login failed: ${error.message}`);
+    }
+
+    // Wait for app loader to disappear
+    await browserManager.waitForAppLoader();
+    
+    return browserManager;
+  }
+
+  async takeTestScreenshot(userId, testStep, browserManager, testResults, error = null) {
+    try {
+      const screenshotPath = await browserManager.takeScreenshot(userId, testStep, error);
+      if (screenshotPath) {
+        testResults.screenshots.push(screenshotPath);
+        console.log(`📸 Screenshot captured for User ${userId} at step: ${testStep}`);
+      }
+      return screenshotPath;
+    } catch (screenshotError) {
+      console.error(`❌ Failed to capture screenshot for User ${userId} at step ${testStep}:`, screenshotError.message);
+      return null;
+    }
+  }
+
+  async cleanupFiles(screenshots, csvFiles) {
+    try {
+      console.log("🧹 Starting cleanup of generated files...");
+      
+      // Clean up screenshots
+      if (screenshots && screenshots.length > 0) {
+        for (const screenshot of screenshots) {
+          if (fs.existsSync(screenshot)) {
+            fs.unlinkSync(screenshot);
+            console.log(`🗑️  Deleted screenshot: ${screenshot}`);
+          }
+        }
+      }
+      
+      // Clean up CSV files
+      if (csvFiles && csvFiles.length > 0) {
+        for (const csvFile of csvFiles) {
+          if (fs.existsSync(csvFile)) {
+            fs.unlinkSync(csvFile);
+            console.log(`🗑️  Deleted CSV file: ${csvFile}`);
+          }
+        }
+      }
+      
+      // Clean up error info files
+      const screenshotsDir = 'testReports/screenshots';
+      if (fs.existsSync(screenshotsDir)) {
+        const files = fs.readdirSync(screenshotsDir);
+        for (const file of files) {
+          if (file.endsWith('_error.txt')) {
+            const filePath = `${screenshotsDir}/${file}`;
+            fs.unlinkSync(filePath);
+            console.log(`🗑️  Deleted error file: ${filePath}`);
+          }
+        }
+      }
+      
+      console.log("✅ Cleanup completed successfully");
+    } catch (error) {
+      console.error("❌ Error during cleanup:", error.message);
+    }
   }
 
   async runAllTests() {
@@ -1120,6 +1521,40 @@ class VizpadTestRunner {
 
     console.log(`Starting vizpad performance test with ${numUsers} users`);
     console.log(`Vizpad URL: ${CONFIG.vizpadUrl}`);
+
+    // Global crash handler for unexpected errors
+    process.on('uncaughtException', async (error) => {
+      console.error('💥 Uncaught Exception:', error);
+      console.log('📸 Attempting to capture crash screenshot...');
+      
+      // Try to capture a crash screenshot if possible
+      try {
+        const crashScreenshotPath = `testReports/screenshots/crash_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+        if (fs.existsSync('testReports/screenshots')) {
+          // This is a best-effort attempt - may not work in all crash scenarios
+          console.log('⚠️  Crash screenshot capture attempted');
+        }
+      } catch (crashError) {
+        console.error('❌ Failed to capture crash screenshot:', crashError.message);
+      }
+      
+      process.exit(1);
+    });
+
+    process.on('unhandledRejection', async (reason, promise) => {
+      console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+      console.log('📸 Attempting to capture rejection screenshot...');
+      
+      // Try to capture a rejection screenshot if possible
+      try {
+        const rejectionScreenshotPath = `testReports/screenshots/rejection_${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+        if (fs.existsSync('testReports/screenshots')) {
+          console.log('⚠️  Rejection screenshot capture attempted');
+        }
+      } catch (rejectionError) {
+        console.error('❌ Failed to capture rejection screenshot:', rejectionError.message);
+      }
+    });
 
     // Create test promises for concurrent execution
     const testPromises = Array(numUsers)
@@ -1141,7 +1576,7 @@ class VizpadTestRunner {
     // Debug: Log the results to see what we're working with
     console.log(`\n=== DEBUG: Results Summary ===`);
     console.log(`Number of results: ${results.length}`);
-    console.log(`Results structure:`, JSON.stringify(results[0], null, 2));
+    // console.log(`Results structure:`, JSON.stringify(results[0], null, 2));
 
     // Display network timings
     console.log('\n📡 Network Timings:\n');
@@ -1160,7 +1595,13 @@ class VizpadTestRunner {
       .slice(0, 15);
 
     for (const req of sorted) {
-      console.log(`${req.method.padEnd(6)} ${req.status || '-'}  ${req.durationMs.toString().padStart(5)} ms  ${req.url}`);
+      let extraInfo = '';
+      if (req.chartName) {
+        extraInfo = ` [Chart: ${req.chartName}]`;
+      } else if (req.datasetName) {
+        extraInfo = ` [Dataset: ${req.datasetName}]`;
+      }
+      console.log(`${req.method.padEnd(6)} ${req.status || '-'}  ${req.durationMs.toString().padStart(5)} ms  ${req.url}${extraInfo}`);
     }
 
     // Save network logs to text file
@@ -1172,21 +1613,23 @@ class VizpadTestRunner {
     networkLogContent += `Script Runtime: ${scriptRunTime}s\n\n`;
     
     networkLogContent += `Top 15 Slowest Network Requests:\n`;
-    networkLogContent += `${'Method'.padEnd(6)} ${'Status'.padEnd(6)} ${'Duration'.padStart(8)} ${'URL'}\n`;
-    networkLogContent += `${'-'.repeat(6)} ${'-'.repeat(6)} ${'-'.repeat(8)} ${'-'.repeat(50)}\n`;
+    networkLogContent += `${'Method'.padEnd(6)} ${'Status'.padEnd(6)} ${'Duration'.padStart(8)} ${'Chart/Dataset Name'.padEnd(30)} ${'URL'}\n`;
+    networkLogContent += `${'-'.repeat(6)} ${'-'.repeat(6)} ${'-'.repeat(8)} ${'-'.repeat(30)} ${'-'.repeat(50)}\n`;
     
     for (const req of sorted) {
-      networkLogContent += `${req.method.padEnd(6)} ${(req.status || '-').toString().padEnd(6)} ${req.durationMs.toString().padStart(8)} ms  ${req.url}\n`;
+      const name = req.chartName || req.datasetName || 'N/A';
+      networkLogContent += `${req.method.padEnd(6)} ${(req.status || '-').toString().padEnd(6)} ${req.durationMs.toString().padStart(8)} ms  ${name.padEnd(30)} ${req.url}\n`;
     }
     
     // Add all network requests (not just top 15) for complete analysis
     networkLogContent += `\n\nAll Network Requests (sorted by duration):\n`;
-    networkLogContent += `${'Method'.padEnd(6)} ${'Status'.padEnd(6)} ${'Duration'.padStart(8)} ${'MIME Type'.padEnd(20)} ${'URL'}\n`;
-    networkLogContent += `${'-'.repeat(6)} ${'-'.repeat(6)} ${'-'.repeat(8)} ${'-'.repeat(20)} ${'-'.repeat(50)}\n`;
+    networkLogContent += `${'Method'.padEnd(6)} ${'Status'.padEnd(6)} ${'Duration'.padStart(8)} ${'Chart/Dataset Name'.padEnd(30)} ${'MIME Type'.padEnd(20)} ${'URL'}\n`;
+    networkLogContent += `${'-'.repeat(6)} ${'-'.repeat(6)} ${'-'.repeat(8)} ${'-'.repeat(30)} ${'-'.repeat(20)} ${'-'.repeat(50)}\n`;
     
     const allSorted = allNetworkRequests.sort((a, b) => b.durationMs - a.durationMs);
     for (const req of allSorted) {
-      networkLogContent += `${req.method.padEnd(6)} ${(req.status || '-').toString().padEnd(6)} ${req.durationMs.toString().padStart(8)} ms  ${(req.mimeType || '-').padEnd(20)} ${req.url}\n`;
+      const name = req.chartName || req.datasetName || 'N/A';
+      networkLogContent += `${req.method.padEnd(6)} ${(req.status || '-').toString().padEnd(6)} ${req.durationMs.toString().padStart(8)} ms  ${name.padEnd(30)} ${(req.mimeType || '-').padEnd(20)} ${req.url}\n`;
     }
     
     // Add summary statistics
@@ -1225,12 +1668,12 @@ class VizpadTestRunner {
 
     // Add headers with tab index information
     let headerRow =
-      "User ID,Vizpad Load (s),Chart Load (s),Area Filter 1 (s),Tab Switch 1 (s) - Tab Index,Area Filter 2 (s),Tab Switch 2 (s) - Tab Index,Region Filter (s),Territory Filter (s),Tab Switch 3 (s) - Tab Index,Area Filter 3 (s),Status,Error Message\n";
+      "User ID,Login Time (s),API Load Time (s),Vizpad Load (s),Chart Load (s),Area Filter 1 (s),Tab Switch 1 (s) - Tab Index,Area Filter 2 (s),Tab Switch 2 (s) - Tab Index,Region Filter (s),Territory Filter (s),Tab Switch 3 (s) - Tab Index,Area Filter 3 (s),Status,Error Message\n";
     csvContent += headerRow;
 
     // Add data rows with tab index information
     results.forEach((result) => {
-      let dataRow = `${result.userId || 0},${result.vizpadLoadTime || 0},${
+      let dataRow = `${result.userId || 0},${result.loginTime || 0},${result.apiLoadTime || 0},${result.vizpadLoadTime || 0},${
         result.chartLoadTime || 0
       }`;
       dataRow += `,${result.areaFilterTime1 || 0}`;
@@ -1258,6 +1701,22 @@ class VizpadTestRunner {
     console.log(`CSV file saved successfully: ${filename}`);
     console.log(`CSV contains ${results.length} user records`);
 
+    // Create detailed network requests CSV file
+    const networkCsvFilename = `testReports/network_requests_${numUsers}_users.csv`;
+    let networkCsvContent = "User ID,Request ID,Method,Status,Duration (ms),Chart Name,Dataset Name,MIME Type,URL,Start Time,End Time\n";
+    
+    results.forEach((result, resultIndex) => {
+      if (result.networkRequests) {
+        result.networkRequests.forEach((req, reqIndex) => {
+          const userRow = `${result.userId || resultIndex + 1},${req.requestId || reqIndex + 1},${req.method || 'N/A'},${req.status || 'N/A'},${req.durationMs || 0},${req.chartName || 'N/A'},${req.datasetName || 'N/A'},${req.mimeType || 'N/A'},"${req.url || 'N/A'}",${req.startTime || 0},${req.endTime || 0}\n`;
+          networkCsvContent += userRow;
+        });
+      }
+    });
+    
+    fs.writeFileSync(networkCsvFilename, networkCsvContent);
+    console.log(`📊 Detailed network requests CSV saved: ${networkCsvFilename}`);
+
     // Print summary
     console.log("\n=== VIZPAD PERFORMANCE TEST SUMMARY ===");
     console.log(`Total script runtime: ${scriptRunTime}s`);
@@ -1275,6 +1734,8 @@ class VizpadTestRunner {
 
       const row = {
         "User ID": result.userId,
+        "Login Time (s)": result.loginTime.toFixed(2),
+        "API Load Time (s)": result.apiLoadTime.toFixed(2),
         "Vizpad Load (s)": result.vizpadLoadTime.toFixed(2),
         "Chart Load (s)": result.chartLoadTime.toFixed(2),
         // 'Area Filter 1 (s)': result.areaFilterTime1.toFixed(2),
@@ -1317,6 +1778,14 @@ class VizpadTestRunner {
     if (successfulResults.length > 0) {
       console.log("\n=== AVERAGE PERFORMANCE METRICS ===");
       const averages = {
+        "Average Login Time (s)": (
+          successfulResults.reduce((sum, r) => sum + r.loginTime, 0) /
+          successfulResults.length
+        ).toFixed(2),
+        "Average API Load Time (s)": (
+          successfulResults.reduce((sum, r) => sum + r.apiLoadTime, 0) /
+          successfulResults.length
+        ).toFixed(2),
         "Average Vizpad Load (s)": (
           successfulResults.reduce((sum, r) => sum + r.vizpadLoadTime, 0) /
           successfulResults.length
@@ -1357,19 +1826,55 @@ class VizpadTestRunner {
     if (CONFIG.enableEmail) {
       try {
         console.log("\n📧 Sending email report...");
+        
+        // Collect all screenshots from failed tests
+        const allScreenshots = [];
+        results.forEach(result => {
+          console.log(`📸 User ${result.userId} screenshots:`, result.screenshots);
+          if (result.screenshots && result.screenshots.length > 0) {
+            allScreenshots.push(...result.screenshots);
+          }
+        });
+        
+        console.log(`📸 Found ${allScreenshots.length} screenshot(s) to attach`);
+        console.log(`📸 Screenshot paths:`, allScreenshots);
+        
         const emailService = new EmailService();
         await emailService.sendTestResults(
           results,
           numUsers,
           scriptRunTime,
           CONFIG.vizpadUrl,
-          filename
+          filename,
+          networkCsvFilename,
+          networkLogFilename,
+          null, // comprehensiveNetworkCsvFilePath (not used in current implementation)
+          allScreenshots
         );
         console.log("✅ Email report sent successfully!");
+        
+        // Clean up files after successful email sending
+        const csvFiles = [filename, networkCsvFilename, networkLogFilename].filter(f => f);
+        await this.cleanupFiles(allScreenshots, csvFiles);
+        
       } catch (error) {
         console.error("❌ Failed to send email report:", error.message);
         console.log("Continuing without email...");
+        
+        // Still clean up files even if email fails
+        const csvFiles = [filename, networkCsvFilename, networkLogFilename].filter(f => f);
+        await this.cleanupFiles(allScreenshots, csvFiles);
       }
+    } else {
+      // Clean up files even if email is disabled
+      const csvFiles = [filename, networkCsvFilename, networkLogFilename].filter(f => f);
+      const allScreenshots = [];
+      results.forEach(result => {
+        if (result.screenshots && result.screenshots.length > 0) {
+          allScreenshots.push(...result.screenshots);
+        }
+      });
+      await this.cleanupFiles(allScreenshots, csvFiles);
     }
   }
 }
@@ -1390,4 +1895,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { VizpadTestRunner, BrowserManager, PerformanceMetrics };
+module.exports = { VizpadTestRunner, BrowserManager, PerformanceMetrics, LoaderComponent  };
