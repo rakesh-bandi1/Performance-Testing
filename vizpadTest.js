@@ -794,14 +794,29 @@ class VizpadTestRunner {
     // Wait for APIs with detailed logging
     console.log(`User ${userId}: Waiting for APIs...`);
 
-    const apiPromises = [
+      const apiPromises = [
+        {
+          name: "auth/runtimeConfig",
+          promise: browserManager.page.waitForResponse(
+            (response) =>
+              response.url().includes("/auth/runtimeConfig") &&
+              response.request().method() === "GET",
+          ),
+        },
+        {
+          name: "businessViews",
+          promise: browserManager.page.waitForResponse(
+            (response) =>
+              response.url().includes("/businessViews") &&
+              response.request().method() === "GET",
+          ),
+        },
       {
         name: "vizpadView",
         promise: browserManager.page.waitForResponse(
           (response) =>
             response.url().includes("/vizpadView") &&
             response.request().method() === "GET",
-          { timeout: CONFIG.timeouts.navigation }
         ),
       },
       {
@@ -810,27 +825,9 @@ class VizpadTestRunner {
           (response) =>
             response.url().includes("/vizItem") &&
             response.request().method() === "GET",
-          { timeout: CONFIG.timeouts.navigation }
         ),
-      },
-      {
-        name: "businessViews",
-        promise: browserManager.page.waitForResponse(
-          (response) =>
-            response.url().includes("/businessViews") &&
-            response.request().method() === "GET",
-          { timeout: CONFIG.timeouts.navigation }
-        ),
-      },
-      {
-        name: "auth/runtimeConfig",
-        promise: browserManager.page.waitForResponse(
-          (response) =>
-            response.url().includes("/auth/runtimeConfig") &&
-            response.request().method() === "GET",
-          { timeout: CONFIG.timeouts.navigation }
-        ),
-      },
+      }
+      
     ];
 
     // Track each API individually
@@ -863,6 +860,8 @@ class VizpadTestRunner {
           duration: apiDuration,
           error: error.message,
         });
+        await this.takeTestScreenshot(userId, 'api_failure', browserManager, testResults, error);
+
         throw new Error(`API ${api.name} failed: ${error.message}`);
       }
     }
