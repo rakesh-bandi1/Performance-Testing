@@ -157,7 +157,7 @@ class BrowserManager {
 
   async launch() {
     this.browser = await puppeteer.launch({
-      headless: false,
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -253,6 +253,7 @@ class BrowserManager {
       const screenshotsDir = 'testReports/screenshots';
       if (!fs.existsSync(screenshotsDir)) {
         fs.mkdirSync(screenshotsDir, { recursive: true });
+        console.log(`📁 Created screenshots directory: ${screenshotsDir}`);
       }
 
       await this.page.screenshot({
@@ -263,6 +264,15 @@ class BrowserManager {
 
       console.log(`📸 Screenshot captured: ${screenshotPath}`);
       
+      // Verify the file was actually created
+      if (fs.existsSync(screenshotPath)) {
+        const stats = fs.statSync(screenshotPath);
+        console.log(`📸 Screenshot file size: ${stats.size} bytes`);
+      } else {
+        console.error(`❌ Screenshot file was not created: ${screenshotPath}`);
+        return null;
+      }
+      
       // Add error context to screenshot if provided
       if (error) {
         const errorInfoPath = `testReports/screenshots/user_${userId}_${testStep}_${timestamp}_error.txt`;
@@ -272,7 +282,7 @@ class BrowserManager {
           timestamp,
           error: error.message || error,
           stack: error.stack || 'No stack trace available',
-          url: await this.page.url().catch(() => 'Unknown URL')
+          url: this.page.url() || 'Unknown URL'
         };
         
         fs.writeFileSync(errorInfoPath, JSON.stringify(errorInfo, null, 2));
@@ -596,6 +606,11 @@ class VizpadTestRunner {
       // Step 5: Apply Area filter and wait for all charts to load
       // console.log(`User ${userId}: Step 5 - Applying Area filter`);
       // await this.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime3');
+      
+      // Take a final screenshot to verify screenshot functionality
+      console.log(`User ${userId}: Taking final test completion screenshot`);
+      await this.takeTestScreenshot(userId, 'test_completion', browserManager, testResults);
+      
     } catch (error) {
       testResults.success = false;
       this.metrics.addError(userId, error, "Vizpad test execution");
