@@ -20,7 +20,7 @@ async function runInteractiveVizpadTest() {
     
     // 1. Ask for complete vizpad URL
     // const vizUrl = await askQuestion('Enter the complete vizpad URL: ');
-    const url = 'https://galaxyai.bayer.com/dashboard/72ed4cae-f8c3-4d20-a8d3-897355f56d36/875c7d53-6502-4b78-a1e7-588104950912?utm_source=283cda68-9c49-4cbf-b581-91f0a09eec5f';
+    const url = 'https://galaxyai-dev.bayer.com/dashboard/60f7edee-af68-4b81-9721-cba9166fab26/a23139b8-e035-4c2f-b38c-548636d33bc6';
     
     // 2. Get number of users from command line argument or default to 1
     // Usage: npm run run_vizpad_test --users=5
@@ -33,7 +33,7 @@ async function runInteractiveVizpadTest() {
     
     // 4. Ask for email configuration
     // const enableEmail = await askQuestion('Send results via email? (y/n, default: n): ');
-    const enableEmail = 'y';
+    const enableEmail = 'n';
     const emailEnabled = enableEmail.trim().toLowerCase() === 'y' || enableEmail.trim().toLowerCase() === 'yes';
     
     console.log(`\nRunning vizpad test with:`);

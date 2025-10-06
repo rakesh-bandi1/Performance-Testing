@@ -3,12 +3,12 @@ const puppeteer = require("puppeteer");
 const fs = require("fs");
 const { getRandomData, getRandomFilterData } = require("./helper.js");
 const EmailService = require("./emailService.js");
-
-// Configuration
+// Using built-in fetch API (Node.js 18+)
+const fetch = globalThis.fetch;
 const CONFIG = {
   vizpadUrl:
     process.argv[2] ||
-    "https://galaxyai.bayer.com/dashboard/270c03b/a5986ed7-28c8-4739-bc84-8ef2dfead134?utm_source=546bf610-3e40-4ebb-b57e-78a7f5a076fc",
+    "https://galaxyai-dev.bayer.com/dashboard/60f7edee-af68-4b81-9721-cba9166fab26/a23139b8-e035-4c2f-b38c-548636d33bc6",
   tabSwitch: process.argv[4] || "false",
   enableEmail:
     process.argv[5] === "true" || process.env.ENABLE_EMAIL === "true",
@@ -55,9 +55,9 @@ const CONFIG = {
     DateColumn: "CONVERSION_DATE",
   },
   login: {
-    username: process.argv[6] || "superUser",
-    password: process.argv[7] || "zd%P*(4*5he9WEUO",
-    baseUrl: process.argv[8] || "https://galaxyai-dev.bayer.com/login/default",
+    username: process.argv[6] || "bayer-admin",
+    password: process.argv[7] || "Tellius123!",
+    baseUrl: process.argv[8] || "https://galaxyai-dev.bayer.com/api/login",
   },
   delays: {
     pageLoad: 2000,
@@ -525,15 +525,15 @@ class VizpadTestRunner {
     try {
       await browserManager.launch();
 
-      // Step 0: Perform login
-      console.log(`User ${userId}: Step 0 - Performing login`);
-      await this.performLogin(userId, testResults, browserManager);
+      // Step 0: Perform API login (faster than UI login)
+      console.log(`User ${userId}: Step 0 - Performing API login`);
+      await this.performAPILogin(userId, testResults, browserManager);
 
       // Step 1: Open the Embed URL and wait for all charts to load
       console.log(
         `User ${userId}: Step 1 - Loading Vizpad and waiting for charts`
       );
-      // await this.performVizpadTest(userId, testResults, browserManager);
+      await this.performVizpadTest(userId, testResults, browserManager);
 
       // Step 2: Apply Area filter and wait for all charts to load
       // console.log(`User ${userId}: Step 2 - Applying Area filter`);
@@ -544,13 +544,13 @@ class VizpadTestRunner {
       // const randomTab1 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
       // testResults.randomTab1 = randomTab1;
       // console.log(`User ${userId}: Step 3 - Switching to random Tab ${randomTab1}`);
-      // await this.performTabSwitch(
-      //   userId,
-      //   testResults,
-      //   browserManager,
-      //   2,
-      //   "tabSwitchTime1"
-      // );
+      await this.performTabSwitch(
+        userId,
+        testResults,
+        browserManager,
+        2,
+        "tabSwitchTime1"
+      );
       // await this.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime2');
 
       // Step 4: Switch to another random tab and wait for all charts to load
@@ -561,13 +561,13 @@ class VizpadTestRunner {
       // }
       // testResults.randomTab2 = randomTab2;
       // console.log(`User ${userId}: Step 4 - Switching to random Tab ${randomTab2}`);
-      // await this.performTabSwitch(
-      //   userId,
-      //   testResults,
-      //   browserManager,
-      //   3,
-      //   "tabSwitchTime2"
-      // );
+      await this.performTabSwitch(
+        userId,
+        testResults,
+        browserManager,
+        3,
+        "tabSwitchTime2"
+      );
 
       // Step 5: Apply Region filter and wait for all charts to load
       console.log(`User ${userId}: Step 5 - Applying Region filter`);
@@ -585,13 +585,13 @@ class VizpadTestRunner {
       // }
       // testResults.randomTab3 = randomTab3;
       // console.log(`User ${userId}: Step 7 - Switching to random Tab ${randomTab3}`);
-      // await this.performTabSwitch(
-      //   userId,
-      //   testResults,
-      //   browserManager,
-      //   4,
-      //   "tabSwitchTime3"
-      // );
+      await this.performTabSwitch(
+        userId,
+        testResults,
+        browserManager,
+        4,
+        "tabSwitchTime3"
+      );
 
       // Step 5: Apply Area filter and wait for all charts to load
       // console.log(`User ${userId}: Step 5 - Applying Area filter`);
@@ -1359,6 +1359,123 @@ class VizpadTestRunner {
       throw error;
     }
   }
+
+  async performAPILogin(userId, testResults, browserManager, credentials) {
+    console.log(`User ${userId}: Starting API login process`);
+    process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0"
+    const loginStartTime = new Date();
+  
+    try {
+      // Build login API URL
+      const currentUrl = CONFIG.login.baseUrl;
+  
+      console.log(`User ${userId}: Making API login request to: ${currentUrl}`);
+  
+      // Make API login request from Node (not inside the page)
+
+      console.log(`User ${userId}: Making API login request to: ${currentUrl}`);
+      console.log(`User ${userId}: API login request body:`, JSON.stringify({
+        username: CONFIG.login.username,
+        password: CONFIG.login.password,
+        session: true,
+      }));
+      
+      const response = await fetch(currentUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          username: CONFIG.login.username,
+          password: CONFIG.login.password,
+          session: true,
+        }),
+      });
+      
+      console.log(`User ${userId}: API login response status: ${response.status}`);
+      const loginEndTime = new Date();
+      const loginTime = (loginEndTime - loginStartTime) / 1000;
+      
+      const responseData = await response.json();
+      const headers = Object.fromEntries(response.headers.entries());
+      console.log(`User ${userId}: Response headers:`, headers);
+  
+      // Check for success
+      if (!response.ok) {
+        throw new Error(`API login failed with status ${response.status}: ${response.statusText}`);
+      }
+  
+      // Extract session cookie from header
+      const setCookieHeader = headers['set-cookie'];
+      let sessionValue = null;
+  
+      if (setCookieHeader) {
+        const sessionMatch = setCookieHeader.match(/tellius_session=([^;]+)/);
+        if (sessionMatch) {
+          sessionValue = sessionMatch[1];
+          console.log(`User ${userId}: Session cookie extracted successfully`);
+        }
+      }
+  
+      // Set cookie in Puppeteer
+      if (sessionValue) {
+        const cookieObj = {
+          name: 'tellius_session',
+          value: sessionValue,
+          domain: new URL(CONFIG.login.baseUrl).hostname,
+          path: '/',
+          secure: true,
+          httpOnly: true,
+          sameSite: 'None',
+        };
+        await browserManager.page.setCookie(cookieObj);
+        console.log(`User ${userId}: tellius_session cookie set in browser`);
+      } else {
+        console.warn(`User ${userId}: No tellius_session cookie found in response`);
+      }
+  
+      // Navigate to Vizpad
+      await browserManager.navigateTo(CONFIG.vizpadUrl);
+  
+      // Set user data in localStorage
+      const userData = {
+        role: 'admin',
+        id: responseData?.id,
+      };
+  
+      await browserManager.page.evaluate((data) => {
+        console.log(data, "data")
+        localStorage.setItem('userInfo', JSON.stringify(data));
+        console.log('User data set in localStorage:', data);
+      }, userData);
+  
+      console.log(`User ${userId}: User data set in localStorage`);
+  
+      // Measure total login time
+
+      console.log(`User ${userId}: API login completed in ${loginTime}s`);
+  
+      // Store results
+      testResults.loginTime = loginTime;
+      testResults.apiLoadTime = loginTime; // Set API Load Time to login time
+  
+      return true;
+    } catch (error) {
+      console.error(`User ${userId}: API login failed:`, error.message);
+  
+      await browserManager.takeScreenshot(userId, 'api_login_failure', error);
+  
+      testResults.errors.push({
+        step: 'API Login',
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+  
+      throw error;
+    }
+  }
+  
 
   async performLogin(userId, testResults, browserManager) {
     console.log(`User ${userId}: Starting login process`);

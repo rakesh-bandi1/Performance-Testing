@@ -1,0 +1,25 @@
+User ID,Request ID,Method,Status,Duration (ms),Chart Name,Dataset Name,MIME Type,URL,Start Time,End Time
+1,24832.40,GET,200,610,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/businessViews?includeColumns=false&includingShared=true&withSharings=true",1759731299820,1759731300430
+1,24832.41,GET,200,418,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/datasetMetadata?includingShared=true&forFrontend=true&sortBy=createdAt&ascending=false&limit=300",1759731299820,1759731300238
+1,24832.46,GET,200,393,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/auth/runtimeConfig",1759731299821,1759731300214
+1,24832.42,GET,200,389,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/api/config",1759731299820,1759731300209
+1,24832.39,GET,200,272,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/customCalendars",1759731299550,1759731299822
+1,24833.41,GET,200,448,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/datasetMetadata?includingShared=true&forFrontend=true&sortBy=createdAt&ascending=false&limit=300",1759731300234,1759731300682
+1,24833.39,GET,200,383,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/customCalendars",1759731299857,1759731300240
+1,24833.46,GET,200,361,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/auth/runtimeConfig",1759731300234,1759731300595
+1,24833.42,GET,200,354,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/api/config",1759731300234,1759731300588
+2,24834.40,GET,200,576,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/businessViews?includeColumns=false&includingShared=true&withSharings=true",1759731299810,1759731300386
+2,24834.41,GET,200,385,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/datasetMetadata?includingShared=true&forFrontend=true&sortBy=createdAt&ascending=false&limit=300",1759731299810,1759731300195
+2,24834.46,GET,200,350,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/auth/runtimeConfig",1759731299811,1759731300161
+2,24834.42,GET,200,337,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/api/config",1759731299810,1759731300147
+2,24834.39,GET,200,274,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/customCalendars",1759731299538,1759731299812
+3,24835.40,GET,200,662,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/businessViews?includeColumns=false&includingShared=true&withSharings=true",1759731300240,1759731300902
+3,24835.41,GET,200,505,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/datasetMetadata?includingShared=true&forFrontend=true&sortBy=createdAt&ascending=false&limit=300",1759731300240,1759731300745
+3,24835.42,GET,200,442,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/api/config",1759731300240,1759731300682
+3,24835.46,GET,200,401,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/auth/runtimeConfig",1759731300240,1759731300641
+3,24835.39,GET,200,400,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/customCalendars",1759731299841,1759731300241
+4,24836.40,GET,200,593,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/businessViews?includeColumns=false&includingShared=true&withSharings=true",1759731300356,1759731300949
+4,24836.41,GET,200,482,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/datasetMetadata?includingShared=true&forFrontend=true&sortBy=createdAt&ascending=false&limit=300",1759731300356,1759731300838
+4,24836.46,GET,200,395,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/auth/runtimeConfig",1759731300356,1759731300751
+4,24836.42,GET,200,393,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/api/config",1759731300356,1759731300749
+4,24836.39,GET,200,279,N/A,N/A,application/json,"https://galaxyai-dev.bayer.com/customCalendars",1759731300078,1759731300357
