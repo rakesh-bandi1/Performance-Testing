@@ -16,11 +16,11 @@ class EmailService {
       
       // Email Configuration
       from: config.from || process.env.EMAIL_FROM || 'learnmern2024@gmail.com',
-      to: config.to || process.env.EMAIL_TO || 'rakesh.bandi@tellius.com',
+      to: config.to || process.env.EMAIL_TO || ['rakesh.bandi@tellius.com', "ankur.gollen@tellius.com", "suresh.dammu@tellius.com"],
       subject: config.subject || 'Vizpad Performance Test Results',
       
       // Optional settings
-      cc: config.cc || process.env.EMAIL_CC || 'ankur.gollen@tellius.com',
+      cc: config.cc || process.env.EMAIL_CC || 'sriram.c@tellius.com',
       bcc: config.bcc || process.env.EMAIL_BCC || '',
       
       ...config
@@ -66,6 +66,7 @@ class EmailService {
     
     if (successfulResults.length > 0) {
       averages = {
+        APILogin: (successfulResults.reduce((sum, r) => sum + r.apiLoadTime, 0) / successfulResults.length).toFixed(2),
         vizpadLoad: (successfulResults.reduce((sum, r) => sum + r.vizpadLoadTime, 0) / successfulResults.length).toFixed(2),
         chartLoad: (successfulResults.reduce((sum, r) => sum + r.chartLoadTime, 0) / successfulResults.length).toFixed(2),
         areaFilter: (successfulResults.reduce((sum, r) => sum + r.areaFilterTime, 0) / successfulResults.length).toFixed(2),
@@ -122,11 +123,11 @@ class EmailService {
                 <th>Average Time (seconds)</th>
             </tr>
             <tr>
-                <td>Vizpad Load</td>
-                <td class="metric-value">${averages.vizpadLoad}</td>
+                <td>APILogin</td>
+                <td class="metric-value">${averages.APILogin}</td>
             </tr>
             <tr>
-                <td>Chart Load</td>
+                <td>Vizpad Load</td>
                 <td class="metric-value">${averages.chartLoad}</td>
             </tr>
             <tr>
@@ -162,8 +163,8 @@ class EmailService {
         <table>
             <tr>
                 <th>User ID</th>
+                <th>APILogin (s)</th>
                 <th>Vizpad Load (s)</th>
-                <th>Chart Load (s)</th>
                 <th>Area Filter (s)</th>
                 <th>Tab Switch 1 (s) - Tab Index</th>
                 <th>Tab Switch 2 (s) - Tab Index</th>
@@ -175,8 +176,8 @@ class EmailService {
             ${results.map(result => `
             <tr>
                 <td>${result.userId}</td>
-                <td>${result.vizpadLoadTime ? result.vizpadLoadTime.toFixed(2) : 'N/A'}</td>
-                <td>${result.chartLoadTime ? result.chartLoadTime.toFixed(2) : 'N/A'}</td>
+                <td>${result.apiLoadTime ? result.apiLoadTime.toFixed(2) : 'N/A'}</td>
+                <td>${result.vizpadLoadTime ? result.chartLoadTime.toFixed(2) : 'N/A'}</td>
                 <td>${result.areaFilterTime ? result.areaFilterTime.toFixed(2) : 'N/A'}</td>
                 <td>${result.tabSwitchTime1 ? `${result.tabSwitchTime1.toFixed(2)} (Tab ${result.randomTab1 || 'N/A'})` : 'N/A'}</td>
                 <td>${result.tabSwitchTime2 ? `${result.tabSwitchTime2.toFixed(2)} (Tab ${result.randomTab2 || 'N/A'})` : 'N/A'}</td>
