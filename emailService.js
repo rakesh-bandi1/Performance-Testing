@@ -16,11 +16,11 @@ class EmailService {
       
       // Email Configuration
       from: config.from || process.env.EMAIL_FROM || 'learnmern2024@gmail.com',
-      to: config.to || process.env.EMAIL_TO || ['rakesh.bandi@tellius.com', "ankur.gollen@tellius.com", "suresh.dammu@tellius.com"],
+      to: config.to || process.env.EMAIL_TO || ['rakesh.bandi@tellius.com'],
       subject: config.subject || 'Vizpad Performance Test Results',
       
       // Optional settings
-      cc: config.cc || process.env.EMAIL_CC || 'sriram.c@tellius.com',
+      cc: config.cc || process.env.EMAIL_CC || '',
       bcc: config.bcc || process.env.EMAIL_BCC || '',
       
       ...config
@@ -56,7 +56,7 @@ class EmailService {
     }
   }
 
-  generateEmailContent(results, numUsers, scriptRunTime, vizpadUrl) {
+  generateEmailContent(results, numUsers, scriptRunTime, vizpadUrl, CONFIG = null) {
     const successfulTests = results.filter(r => r.success).length;
     const failedTests = results.filter(r => !r.success).length;
     
@@ -66,16 +66,29 @@ class EmailService {
     
     if (successfulResults.length > 0) {
       averages = {
-        APILogin: (successfulResults.reduce((sum, r) => sum + r.apiLoadTime, 0) / successfulResults.length).toFixed(2),
-        vizpadLoad: (successfulResults.reduce((sum, r) => sum + r.vizpadLoadTime, 0) / successfulResults.length).toFixed(2),
-        chartLoad: (successfulResults.reduce((sum, r) => sum + r.chartLoadTime, 0) / successfulResults.length).toFixed(2),
-        areaFilter: (successfulResults.reduce((sum, r) => sum + r.areaFilterTime, 0) / successfulResults.length).toFixed(2),
-        tabSwitch1: (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime1, 0) / successfulResults.length).toFixed(2),
-        tabSwitch2: (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime2, 0) / successfulResults.length).toFixed(2),
-        regionFilter: (successfulResults.reduce((sum, r) => sum + r.regionFilterTime, 0) / successfulResults.length).toFixed(2),
-        territoryFilter: (successfulResults.reduce((sum, r) => sum + r.territoryFilterTime, 0) / successfulResults.length).toFixed(2),
-        tabSwitch3: (successfulResults.reduce((sum, r) => sum + r.tabSwitchTime3, 0) / successfulResults.length).toFixed(2),
+        loginTime: (successfulResults.reduce((sum, r) => sum + (r.loginTime || 0), 0) / successfulResults.length).toFixed(2),
+        apiLoadTime: (successfulResults.reduce((sum, r) => sum + (r.apiLoadTime || 0), 0) / successfulResults.length).toFixed(2),
+        vizpadLoad: (successfulResults.reduce((sum, r) => sum + (r.chartLoadTime || 0), 0) / successfulResults.length).toFixed(2),
       };
+
+      // Add dynamic tab switching averages if CONFIG is available
+      if (CONFIG && CONFIG.tabCount > 0) {
+        for (let i = 1; i <= CONFIG.tabCount; i++) {
+          averages[`tabSwitch${i}`] = (successfulResults.reduce((sum, r) => sum + (r[`tabSwitch${i}`] || 0), 0) / successfulResults.length).toFixed(2);
+        }
+      }
+
+      // Add filter averages if filters are enabled and CONFIG is available
+      if (CONFIG && CONFIG.enableFilters) {
+        averages.areaFilter = (successfulResults.reduce((sum, r) => sum + (r.areaFilterTime1 || 0), 0) / successfulResults.length).toFixed(2);
+        averages.regionFilter = (successfulResults.reduce((sum, r) => sum + (r.regionFilterTime || 0), 0) / successfulResults.length).toFixed(2);
+        averages.territoryFilter = (successfulResults.reduce((sum, r) => sum + (r.territoryFilterTime || 0), 0) / successfulResults.length).toFixed(2);
+      }
+
+      // Add time filter average if enabled and CONFIG is available
+      if (CONFIG && CONFIG.enableTimeFilter) {
+        averages.timeFilter = (successfulResults.reduce((sum, r) => sum + (r.timeFilterTime || 0), 0) / successfulResults.length).toFixed(2);
+      }
     }
 
     const htmlContent = `
@@ -123,37 +136,43 @@ class EmailService {
                 <th>Average Time (seconds)</th>
             </tr>
             <tr>
-                <td>APILogin</td>
-                <td class="metric-value">${averages.APILogin}</td>
+                <td>Login Time</td>
+                <td class="metric-value">${averages.loginTime || 'N/A'}</td>
+            </tr>
+            <tr>
+                <td>API Load Time</td>
+                <td class="metric-value">${averages.apiLoadTime || 'N/A'}</td>
             </tr>
             <tr>
                 <td>Vizpad Load</td>
-                <td class="metric-value">${averages.chartLoad}</td>
+                <td class="metric-value">${averages.vizpadLoad || 'N/A'}</td>
             </tr>
+            ${CONFIG && CONFIG.enableFilters ? `
             <tr>
                 <td>Area Filter</td>
-                <td class="metric-value">${averages.areaFilter}</td>
-            </tr>
-            <tr>
-                <td>Tab Switch 1</td>
-                <td class="metric-value">${averages.tabSwitch1}</td>
-            </tr>
-            <tr>
-                <td>Tab Switch 2</td>
-                <td class="metric-value">${averages.tabSwitch2}</td>
+                <td class="metric-value">${averages.areaFilter || 'N/A'}</td>
             </tr>
             <tr>
                 <td>Region Filter</td>
-                <td class="metric-value">${averages.regionFilter}</td>
+                <td class="metric-value">${averages.regionFilter || 'N/A'}</td>
             </tr>
             <tr>
                 <td>Territory Filter</td>
-                <td class="metric-value">${averages.territoryFilter}</td>
+                <td class="metric-value">${averages.territoryFilter || 'N/A'}</td>
             </tr>
+            ` : ''}
+            ${CONFIG && CONFIG.enableTimeFilter ? `
             <tr>
-                <td>Tab Switch 3</td>
-                <td class="metric-value">${averages.tabSwitch3}</td>
+                <td>Time Filter</td>
+                <td class="metric-value">${averages.timeFilter || 'N/A'}</td>
             </tr>
+            ` : ''}
+            ${CONFIG && CONFIG.tabCount > 0 ? Array.from({length: CONFIG.tabCount}, (_, i) => `
+            <tr>
+                <td>Tab Switch ${i + 1}</td>
+                <td class="metric-value">${averages[`tabSwitch${i + 1}`] || 'N/A'}</td>
+            </tr>
+            `).join('') : ''}
         </table>
     </div>
     ` : ''}
@@ -163,27 +182,27 @@ class EmailService {
         <table>
             <tr>
                 <th>User ID</th>
-                <th>APILogin (s)</th>
+                <th>Login Time (s)</th>
+                <th>API Load Time (s)</th>
                 <th>Vizpad Load (s)</th>
-                <th>Area Filter (s)</th>
-                <th>Tab Switch 1 (s) - Tab Index</th>
-                <th>Tab Switch 2 (s) - Tab Index</th>
-                <th>Region Filter (s)</th>
-                <th>Territory Filter (s)</th>
-                <th>Tab Switch 3 (s) - Tab Index</th>
+                ${CONFIG && CONFIG.enableFilters ? '<th>Area Filter (s)</th>' : ''}
+                ${CONFIG && CONFIG.enableFilters ? '<th>Region Filter (s)</th>' : ''}
+                ${CONFIG && CONFIG.enableFilters ? '<th>Territory Filter (s)</th>' : ''}
+                ${CONFIG && CONFIG.enableTimeFilter ? '<th>Time Filter (s)</th>' : ''}
+                ${CONFIG && CONFIG.tabCount > 0 ? Array.from({length: CONFIG.tabCount}, (_, i) => `<th>Tab Switch ${i + 1} (s)</th>`).join('') : ''}
                 <th>Status</th>
             </tr>
             ${results.map(result => `
             <tr>
                 <td>${result.userId}</td>
+                <td>${result.loginTime ? result.loginTime.toFixed(2) : 'N/A'}</td>
                 <td>${result.apiLoadTime ? result.apiLoadTime.toFixed(2) : 'N/A'}</td>
-                <td>${result.vizpadLoadTime ? result.chartLoadTime.toFixed(2) : 'N/A'}</td>
-                <td>${result.areaFilterTime ? result.areaFilterTime.toFixed(2) : 'N/A'}</td>
-                <td>${result.tabSwitchTime1 ? `${result.tabSwitchTime1.toFixed(2)} (Tab ${result.randomTab1 || 'N/A'})` : 'N/A'}</td>
-                <td>${result.tabSwitchTime2 ? `${result.tabSwitchTime2.toFixed(2)} (Tab ${result.randomTab2 || 'N/A'})` : 'N/A'}</td>
-                <td>${result.regionFilterTime ? result.regionFilterTime.toFixed(2) : 'N/A'}</td>
-                <td>${result.territoryFilterTime ? result.territoryFilterTime.toFixed(2) : 'N/A'}</td>
-                <td>${result.tabSwitchTime3 ? `${result.tabSwitchTime3.toFixed(2)} (Tab ${result.randomTab3 || 'N/A'})` : 'N/A'}</td>
+                <td>${result.chartLoadTime ? result.chartLoadTime.toFixed(2) : 'N/A'}</td>
+                ${CONFIG && CONFIG.enableFilters ? `<td>${result.areaFilterTime1 ? result.areaFilterTime1.toFixed(2) : 'N/A'}</td>` : ''}
+                ${CONFIG && CONFIG.enableFilters ? `<td>${result.regionFilterTime ? result.regionFilterTime.toFixed(2) : 'N/A'}</td>` : ''}
+                ${CONFIG && CONFIG.enableFilters ? `<td>${result.territoryFilterTime ? result.territoryFilterTime.toFixed(2) : 'N/A'}</td>` : ''}
+                ${CONFIG && CONFIG.enableTimeFilter ? `<td>${result.timeFilterTime ? result.timeFilterTime.toFixed(2) : 'N/A'}</td>` : ''}
+                ${CONFIG && CONFIG.tabCount > 0 ? Array.from({length: CONFIG.tabCount}, (_, i) => `<td>${result[`tabSwitch${i + 1}`] ? result[`tabSwitch${i + 1}`].toFixed(2) : 'N/A'}</td>`).join('') : ''}
                 <td class="${result.success ? 'success' : 'failed'}">${result.success ? '✅ Success' : '❌ Failed'}</td>
             </tr>
             `).join('')}
@@ -221,29 +240,32 @@ Test Summary:
 - Failed Tests: ${failedTests}
 - Success Rate: ${((successfulTests / numUsers) * 100).toFixed(1)}%
 
-${successfulResults.length > 0 ? `
-Average Performance Metrics:
-- Vizpad Load: ${averages.vizpadLoad} seconds
-- Chart Load: ${averages.chartLoad} seconds
-- Area Filter: ${averages.areaFilter} seconds
-- Tab Switch 1: ${averages.tabSwitch1} seconds
-- Tab Switch 2: ${averages.tabSwitch2} seconds
-- Region Filter: ${averages.regionFilter} seconds
-- Territory Filter: ${averages.territoryFilter} seconds
-- Tab Switch 3: ${averages.tabSwitch3} seconds
-` : ''}
+    ${successfulResults.length > 0 ? `
+    Average Performance Metrics:
+    - Login Time: ${averages.loginTime || 'N/A'} seconds
+    - API Load Time: ${averages.apiLoadTime || 'N/A'} seconds
+    - Vizpad Load: ${averages.vizpadLoad || 'N/A'} seconds
+    ${averages.areaFilter ? `- Area Filter: ${averages.areaFilter} seconds` : ''}
+    ${averages.regionFilter ? `- Region Filter: ${averages.regionFilter} seconds` : ''}
+    ${averages.territoryFilter ? `- Territory Filter: ${averages.territoryFilter} seconds` : ''}
+    ${averages.timeFilter ? `- Time Filter: ${averages.timeFilter} seconds` : ''}
+    ${Object.keys(averages).filter(key => key.includes('Tab Switch')).map(key => `- ${key}: ${averages[key]} seconds`).join('\n')}
+    ` : ''}
 
 Detailed Results:
 ${results.map(result => `
 User ${result.userId}:
-  Vizpad Load: ${result.vizpadLoadTime ? result.vizpadLoadTime.toFixed(2) : 'N/A'}s
-  Chart Load: ${result.chartLoadTime ? result.chartLoadTime.toFixed(2) : 'N/A'}s
-  Area Filter: ${result.areaFilterTime ? result.areaFilterTime.toFixed(2) : 'N/A'}s
-  Tab Switch 1: ${result.tabSwitchTime1 ? `${result.tabSwitchTime1.toFixed(2)}s (Tab ${result.randomTab1 || 'N/A'})` : 'N/A'}
-  Tab Switch 2: ${result.tabSwitchTime2 ? `${result.tabSwitchTime2.toFixed(2)}s (Tab ${result.randomTab2 || 'N/A'})` : 'N/A'}
-  Region Filter: ${result.regionFilterTime ? result.regionFilterTime.toFixed(2) : 'N/A'}s
-  Territory Filter: ${result.territoryFilterTime ? result.territoryFilterTime.toFixed(2) : 'N/A'}s
-  Tab Switch 3: ${result.tabSwitchTime3 ? `${result.tabSwitchTime3.toFixed(2)}s (Tab ${result.randomTab3 || 'N/A'})` : 'N/A'}
+  Login Time: ${result.loginTime ? result.loginTime.toFixed(2) : 'N/A'}s
+  API Load Time: ${result.apiLoadTime ? result.apiLoadTime.toFixed(2) : 'N/A'}s
+  Vizpad Load: ${result.chartLoadTime ? result.chartLoadTime.toFixed(2) : 'N/A'}s
+  ${result.areaFilterTime1 ? `Area Filter: ${result.areaFilterTime1.toFixed(2)}s` : ''}
+  ${result.regionFilterTime ? `Region Filter: ${result.regionFilterTime.toFixed(2)}s` : ''}
+  ${result.territoryFilterTime ? `Territory Filter: ${result.territoryFilterTime.toFixed(2)}s` : ''}
+  ${result.timeFilterTime ? `Time Filter: ${result.timeFilterTime.toFixed(2)}s` : ''}
+  ${Object.keys(result).filter(key => key.startsWith('tabSwitch')).map(key => {
+    const tabNum = key.replace('tabSwitch', '');
+    return `Tab Switch ${tabNum}: ${result[key] ? result[key].toFixed(2) : 'N/A'}s`;
+  }).join('\n  ')}
   Status: ${result.success ? 'SUCCESS' : 'FAILED'}
 `).join('')}
 
@@ -258,11 +280,11 @@ This email was automatically generated by the Vizpad Performance Test Suite.
     return { html: htmlContent, text: textContent };
   }
 
-  async sendTestResults(results, numUsers, scriptRunTime, vizpadUrl, csvFilePath = null, networkCsvFilePath = null, networkLogsFilePath = null, comprehensiveNetworkCsvFilePath = null, screenshots = []) {
+  async sendTestResults(results, numUsers, scriptRunTime, vizpadUrl, csvFilePath = null, networkCsvFilePath = null, networkLogsFilePath = null, comprehensiveNetworkCsvFilePath = null, screenshots = [], CONFIG = null) {
     try {
       await this.createTransporter();
       
-      const { html, text } = this.generateEmailContent(results, numUsers, scriptRunTime, vizpadUrl);
+      const { html, text } = this.generateEmailContent(results, numUsers, scriptRunTime, vizpadUrl, CONFIG);
       
       const mailOptions = {
         from: this.config.from,
