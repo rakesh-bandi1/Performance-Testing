@@ -74,7 +74,7 @@ class TestExecutionHelpers {
     );
   }
 
-  async performAreaFilterTest(userId, testResults, browserManager, timeField = "areaFilterTime1") {
+  async performAreaFilterTest(userId, testResults, browserManager, timeField = "areaFilterTime1", CONFIG) {
     console.log(`User ${userId}: Starting area filter test`);
 
     try {
@@ -117,7 +117,7 @@ class TestExecutionHelpers {
     }
   }
 
-  async performRegionFilterTest(userId, testResults, browserManager) {
+  async performRegionFilterTest(userId, testResults, browserManager, CONFIG) {
     console.log(`User ${userId}: Starting region filter test`);
 
     try {
@@ -163,7 +163,7 @@ class TestExecutionHelpers {
     }
   }
 
-  async performTerritoryFilterTest(userId, testResults, browserManager) {
+  async performTerritoryFilterTest(userId, testResults, browserManager, CONFIG) {
     console.log(`User ${userId}: Starting territory filter test`);
 
     try {
@@ -223,7 +223,7 @@ class TestExecutionHelpers {
     }
   }
 
-  async performTimeFilterTest(userId, testResults, browserManager) {
+  async performTimeFilterTest(userId, testResults, browserManager, CONFIG) {
     console.log(`User ${userId}: Starting time filter test`);
     
     try {
@@ -655,6 +655,7 @@ class TestExecutionHelpers {
             (response) =>
               response.url().includes("/auth/runtimeConfig") &&
               response.request().method() === "GET",
+              {timeout:90000}
           ),
         },
         {
@@ -663,6 +664,7 @@ class TestExecutionHelpers {
             (response) =>
               response.url().includes("/businessViews") &&
               response.request().method() === "GET",
+              {timeout:90000}
           ),
         },
       {
@@ -671,6 +673,7 @@ class TestExecutionHelpers {
           (response) =>
             response.url().includes("/vizpadView") &&
             response.request().method() === "GET",
+            {timeout:90000}
         ),
       },
       {
@@ -679,6 +682,7 @@ class TestExecutionHelpers {
           (response) =>
             response.url().includes("/vizItem") &&
             response.request().method() === "GET",
+            {timeout:90000}
         ),
       }
       
@@ -765,7 +769,7 @@ class TestExecutionHelpers {
     // Collect all network requests from all test results
     const allNetworkRequests = [];
     results.forEach(result => {
-      if (result.networkRequests) {
+      if (result?.networkRequests) {
         allNetworkRequests.push(...result.networkRequests);
       }
     });
@@ -847,30 +851,57 @@ class TestExecutionHelpers {
     let csvContent = "Script Time (s),Number of Users,Vizpad URL\n";
     csvContent += `${scriptRunTime},${numUsers},"${CONFIG.vizpadUrl}"\n\n`;
 
-    // Add headers with tab index information
-    let headerRow =
-      "User ID,Login Time (s),API Load Time (s),Vizpad Load (s),Area Filter 1 (s),Tab Switch 1 (s) - Tab Index,Area Filter 2 (s),Tab Switch 2 (s) - Tab Index,Region Filter (s),Territory Filter (s),Tab Switch 3 (s) - Tab Index,Area Filter 3 (s),Status,Error Message\n";
+    // Generate dynamic headers based on enabled features
+    let headerRow = "User ID,Login Time (s),API Load Time (s),Vizpad Load (s)";
+    
+    // Add tab switching headers if tabCount > 0
+    if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
+      let tabCount = Math.min(CONFIG.tabCount, CONFIG.availableTabs);
+      console.log(tabCount, "HEADER TAB COUNT")
+      for (let i = 1; i <= tabCount; i++) {
+        headerRow += `,Tab Switch ${i} (s)`;
+      }
+    }
+    
+    // Add filter headers if filters are enabled
+    if (CONFIG.enableFilters) {
+      headerRow += ",Area Filter (s),Region Filter (s),Territory Filter (s)";
+    }
+    
+    // Add time filter if enabled
+    if (CONFIG.enableTimeFilter) {
+      headerRow += ",Time Filter (s)";
+    }
+    
+    headerRow += ",Status,Error Message\n";
     csvContent += headerRow;
 
-    // Add data rows with tab index information
+    // Add data rows
     results.forEach((result) => {
-      let dataRow = `${result.userId || 0},${result.loginTime || 0},${result.apiLoadTime || 0},${
-        result.chartLoadTime || 0
-      }`;
-      dataRow += `,${result.areaFilterTime1 || 0}`;
-      dataRow += `,${result.tabSwitchTime1 || 0}`;
-      dataRow += `,${result.areaFilterTime2 || 0}`;
-      dataRow += `,${result.tabSwitchTime2 || 0}`;
-      dataRow += `,${result.regionFilterTime || 0}`;
-      dataRow += `,${result.territoryFilterTime || 0}`;
-      dataRow += `,${result.tabSwitchTime3 || 0}`;
-      dataRow += `,${result.areaFilterTime3 || 0}`;
+      let dataRow = `${result?.userId || 0},${result?.loginTime || 0},${result?.apiLoadTime || 0},${result?.chartLoadTime || 0}`;
+      
+      // Add tab switching data if tabCount > 0
+      if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
+        for (let i = 1; i <= CONFIG.tabCount; i++) {
+          dataRow += `,${result[`tabSwitch${i}`] || 0}`;
+        }
+      }
+      
+      // Add filter data if filters are enabled
+      if (CONFIG.enableFilters) {
+        dataRow += `,${result.areaFilterTime1 || 0},${result.regionFilterTime || 0},${result.territoryFilterTime || 0}`;
+      }
+      
+      // Add time filter data if enabled
+      if (CONFIG.enableTimeFilter) {
+        dataRow += `,${result.timeFilterTime || 0}`;
+      }
 
       // Add status and error message
-      const status = result.success ? "SUCCESS" : "FAILED";
+      const status = result?.success ? "SUCCESS" : "FAILED";
       const errorMessage =
         this.metrics.errors
-          .filter((error) => error.userId === result.userId)
+          .filter((error) => error?.userId === result?.userId)
           .map((error) => error.error)
           .join("; ") || "";
 
@@ -887,9 +918,9 @@ class TestExecutionHelpers {
     let networkCsvContent = "User ID,Request ID,Method,Status,Duration (ms),Chart Name,Dataset Name,MIME Type,URL,Start Time,End Time\n";
     
     results.forEach((result, resultIndex) => {
-      if (result.networkRequests) {
-        result.networkRequests.forEach((req, reqIndex) => {
-          const userRow = `${result.userId || resultIndex + 1},${req.requestId || reqIndex + 1},${req.method || 'N/A'},${req.status || 'N/A'},${req.durationMs || 0},${req.chartName || 'N/A'},${req.datasetName || 'N/A'},${req.mimeType || 'N/A'},"${req.url || 'N/A'}",${req.startTime || 0},${req.endTime || 0}\n`;
+      if (result?.networkRequests) {
+        result?.networkRequests.forEach((req, reqIndex) => {
+          const userRow = `${result?.userId || resultIndex + 1},${req?.requestId || reqIndex + 1},${req?.method || 'N/A'},${req?.status || 'N/A'},${req.durationMs || 0},${req.chartName || 'N/A'},${req.datasetName || 'N/A'},${req.mimeType || 'N/A'},"${req.url || 'N/A'}",${req.startTime || 0},${req.endTime || 0}\n`;
           networkCsvContent += userRow;
         });
       }
@@ -910,31 +941,38 @@ class TestExecutionHelpers {
     console.log("\n=== DETAILED RESULTS TABLE ===");
 
     // Prepare table data with dynamic column names based on actual tab selections
+    // Create table data for display based on enabled features
     const tableData = results.map((result) => {
       const status = result.success ? "✅ Success" : "❌ Failed";
-
       const row = {
         "User ID": result.userId,
         "Login Time (s)": result.loginTime.toFixed(2),
         "API Load Time (s)": result.apiLoadTime.toFixed(2),
         "Vizpad Load (s)": result.chartLoadTime.toFixed(2),
-        // "Chart Load (s)": result.chartLoadTime.toFixed(2),
-        // 'Area Filter 1 (s)': result.areaFilterTime1.toFixed(2),
-        "Tab Switch 1 (s)": `${result.tabSwitchTime1.toFixed(2)} (Tab ${
-          result.randomTab1 || "N/A"
-        })`,
-        // 'Area Filter 2 (s)': result.areaFilterTime2.toFixed(2),
-        "Tab Switch 2 (s)": `${result.tabSwitchTime2.toFixed(2)} (Tab ${
-          result.randomTab2 || "N/A"
-        })`,
-        // 'Region Filter (s)': result.regionFilterTime.toFixed(2),
-        // 'Territory Filter (s)': result.territoryFilterTime.toFixed(2),
-        "Tab Switch 3 (s)": `${result.tabSwitchTime3.toFixed(2)} (Tab ${
-          result.randomTab3 || "N/A"
-        })`,
-        // 'Area Filter 3 (s)': result.areaFilterTime3.toFixed(2),
-        Status: status,
       };
+
+      // Add tab switching columns if tabCount > 0
+      if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
+        let tabCount = Math.min(CONFIG.tabCount, CONFIG.availableTabs);
+        for (let i = 1; i <= tabCount; i++) {
+          row[`Tab Switch ${i} (s)`] = (result[`tabSwitch${i}`] || 0).toFixed(2);
+        }
+      }
+      
+      // Add filter columns if filters are enabled
+      if (CONFIG.enableFilters) {
+        row["Area Filter (s)"] = (result.areaFilterTime1 || 0).toFixed(2);
+        row["Region Filter (s)"] = (result.regionFilterTime || 0).toFixed(2);
+        row["Territory Filter (s)"] = (result.territoryFilterTime || 0).toFixed(2);
+      }
+      
+      // Add time filter if enabled
+      if (CONFIG.enableTimeFilter) {
+        row["Time Filter (s)"] = (result.timeFilterTime || 0).toFixed(2);
+      }
+
+      // Add Status at the end
+      row["Status"] = status;
 
       return row;
     });
@@ -960,35 +998,53 @@ class TestExecutionHelpers {
       console.log("\n=== AVERAGE PERFORMANCE METRICS ===");
       const averages = {
         "Average Login Time (s)": (
-          successfulResults.reduce((sum, r) => sum + r.loginTime, 0) /
+          successfulResults.reduce((sum, r) => sum + (r.loginTime || 0), 0) /
           successfulResults.length
         ).toFixed(2),
         "Average API Load Time (s)": (
-          successfulResults.reduce((sum, r) => sum + r.apiLoadTime, 0) /
+          successfulResults.reduce((sum, r) => sum + (r.apiLoadTime || 0), 0) /
           successfulResults.length
         ).toFixed(2),
         "Average Vizpad Load (s)": (
-          successfulResults.reduce((sum, r) => sum + r.chartLoadTime, 0) /
+          successfulResults.reduce((sum, r) => sum + (r.chartLoadTime || 0), 0) /
           successfulResults.length
         ).toFixed(2),
-        // 'Average Area Filter 1 (s)': (successfulResults.reduce((sum, r) => sum + r.areaFilterTime1, 0) / successfulResults.length).toFixed(2),
-        "Average Tab Switch 1 (s)": (
-          successfulResults.reduce((sum, r) => sum + r.tabSwitchTime1, 0) /
-          successfulResults.length
-        ).toFixed(2),
-        // 'Average Area Filter 2 (s)': (successfulResults.reduce((sum, r) => sum + r.areaFilterTime2, 0) / successfulResults.length).toFixed(2),
-        "Average Tab Switch 2 (s)": (
-          successfulResults.reduce((sum, r) => sum + r.tabSwitchTime2, 0) /
-          successfulResults.length
-        ).toFixed(2),
-        // 'Average Region Filter (s)': (successfulResults.reduce((sum, r) => sum + r.regionFilterTime, 0) / successfulResults.length).toFixed(2),
-        // 'Average Territory Filter (s)': (successfulResults.reduce((sum, r) => sum + r.territoryFilterTime, 0) / successfulResults.length).toFixed(2),
-        "Average Tab Switch 3 (s)": (
-          successfulResults.reduce((sum, r) => sum + r.tabSwitchTime3, 0) /
-          successfulResults.length
-        ).toFixed(2),
-        // 'Average Area Filter 3 (s)': (successfulResults.reduce((sum, r) => sum + r.areaFilterTime3, 0) / successfulResults.length).toFixed(2),
       };
+
+      // Add dynamic tab switching averages
+      if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
+        let tabCount = Math.min(CONFIG.tabCount, CONFIG.availableTabs);
+        for (let i = 1; i <= tabCount; i++) {
+          averages[`Average Tab Switch ${i} (s)`] = (
+            successfulResults.reduce((sum, r) => sum + (r[`tabSwitch${i}`] || 0), 0) /
+            successfulResults.length
+          ).toFixed(2);
+        }
+      }
+
+      // Add filter averages if filters are enabled
+      if (CONFIG.enableFilters) {
+        averages["Average Area Filter (s)"] = (
+          successfulResults.reduce((sum, r) => sum + (r.areaFilterTime1 || 0), 0) /
+          successfulResults.length
+        ).toFixed(2);
+        averages["Average Region Filter (s)"] = (
+          successfulResults.reduce((sum, r) => sum + (r.regionFilterTime || 0), 0) /
+          successfulResults.length
+        ).toFixed(2);
+        averages["Average Territory Filter (s)"] = (
+          successfulResults.reduce((sum, r) => sum + (r.territoryFilterTime || 0), 0) /
+          successfulResults.length
+        ).toFixed(2);
+      }
+
+      // Add time filter average if enabled
+      if (CONFIG.enableTimeFilter) {
+        averages["Average Time Filter (s)"] = (
+          successfulResults.reduce((sum, r) => sum + (r.timeFilterTime || 0), 0) /
+          successfulResults.length
+        ).toFixed(2);
+      }
       console.table(averages);
     }
 
@@ -1007,7 +1063,7 @@ class TestExecutionHelpers {
         // Collect all screenshots from failed tests
         const allScreenshots = [];
         results.forEach(result => {
-          console.log(`📸 User ${result.userId} screenshots:`, result.screenshots);
+          console.log(`📸 User ${result.userId} screenshots:`, result?.screenshots);
           if (result.screenshots && result.screenshots.length > 0) {
             allScreenshots.push(...result.screenshots);
           }
@@ -1026,7 +1082,8 @@ class TestExecutionHelpers {
           networkCsvFilename,
           networkLogFilename,
           null, // comprehensiveNetworkCsvFilePath (not used in current implementation)
-          allScreenshots
+          allScreenshots,
+          CONFIG
         );
         console.log("✅ Email report sent successfully!");
         

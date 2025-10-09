@@ -10,13 +10,63 @@ const BrowserManager = require("./Helper/browserManager.js");
 const PerformanceMetrics = require("./Helper/performanceMetrics.js");
 const TestHelpers = require("./Helper/testHelpers.js");
 const TestExecutionHelpers = require("./Helper/testExecutionHelpers.js");
+// Parse command line arguments
+function parseCommandLineArgs() {
+  const args = process.argv.slice(2);
+  const config = {
+    users: 1,
+    tabCount: 3,
+    username: "",
+    password: "",
+    loginUrl: "",
+    vizpadUrl: "",
+    enableFilters: false,
+    enableTimeFilter: false,
+    enableEmail: false,
+    tabSwitch: "false"
+  };
+
+  args.forEach(arg => {
+    if (arg.startsWith('--users=')) {
+      config.users = parseInt(arg.split('=')[1]) || 1;
+    } else if (arg.startsWith('--tabCount=')) {
+      config.tabCount = parseInt(arg.split('=')[1]) || 3;
+    } else if (arg.startsWith('--username=')) {
+      config.username = arg.split('=')[1] || "";
+    } else if (arg.startsWith('--password=')) {
+      config.password = arg.split('=')[1] || "";
+    } else if (arg.startsWith('--loginUrl=')) {
+      config.loginUrl = arg.split('=')[1] || "";
+    } else if (arg.startsWith('--vizpadUrl=')) {
+      config.vizpadUrl = arg.split('=')[1] || "";
+    } else if (arg.startsWith('--enableFilters=')) {
+      config.enableFilters = arg.split('=')[1] === 'true';
+    } else if (arg.startsWith('--enableTimeFilter=')) {
+      config.enableTimeFilter = arg.split('=')[1] === 'true';
+    } else if (arg.startsWith('--enableEmail=')) {
+      config.enableEmail = arg.split('=')[1] === 'true';
+    } else if (arg.startsWith('--tabSwitch=')) {
+      config.tabSwitch = arg.split('=')[1] || "false";
+    }
+  });
+
+  return config;
+}
+
+const commandLineConfig = parseCommandLineArgs();
+
 const CONFIG = {
-  vizpadUrl:
-    process.argv[2] ||
-    "https://galaxyai-dev.bayer.com/dashboard/57fdc931-8066-482b-af84-a411e64dfc4d/05dbc228-6c8c-49f5-9acb-856eab64dd75",
-  tabSwitch: process.argv[4] || "false",
-  enableEmail:
-    process.argv[5] === "true" || process.env.ENABLE_EMAIL === "true",
+  users: commandLineConfig.users,
+  tabCount: commandLineConfig.tabCount,
+  availableTabs: 0,
+  username: commandLineConfig.username,
+  password: commandLineConfig.password,
+  loginUrl: commandLineConfig.loginUrl,
+  vizpadUrl: commandLineConfig.vizpadUrl,
+  enableFilters: commandLineConfig.enableFilters,
+  enableTimeFilter: commandLineConfig.enableTimeFilter,
+  enableEmail: commandLineConfig.enableEmail,
+  tabSwitch: commandLineConfig.tabSwitch,
   tabIndex: 0,
   timeouts: {
     navigation: 1000000,
@@ -47,6 +97,7 @@ const CONFIG = {
     applyBtn: "[data-cy-id='cy-popup-aply']",
     tab: "cy-tb",
     appLoader: "#appLoader",
+    totalTabs: "[data-cy-id^='cy-tb']",
     territoryEle: `//input[@data-cy-id='cy-viz-title' and @value='Territory']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
     regionEle: `//input[@data-cy-id='cy-viz-title' and @value='Region']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
     areaEle: `//input[@data-cy-id='cy-viz-title' and @value='Area']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
@@ -60,9 +111,9 @@ const CONFIG = {
     DateColumn: "CONVERSION_DATE",
   },
   login: {
-    username: process.argv[6] || "performanceTest",
-    password: process.argv[7] || "auto_TEST4321!",
-    baseUrl: process.argv[8] || "https://galaxyai-dev.bayer.com/api/login",
+    username: commandLineConfig.username,
+    password: commandLineConfig.password,
+    baseUrl: commandLineConfig.loginUrl,
   },
   delays: {
     pageLoad: 2000,
@@ -89,14 +140,8 @@ class VizpadTestRunner {
       areaFilterTime1: 0, // Step 2: Initial area filter
       areaFilterTime2: 0, // Step 3: Area filter after tab switch 1
       areaFilterTime3: 0, // Step 5: Area filter after tab switch 3
-      tabSwitchTime1: 0,
-      tabSwitchTime2: 0,
       regionFilterTime: 0,
       territoryFilterTime: 0,
-      tabSwitchTime3: 0,
-      randomTab1: 0,
-      randomTab2: 0,
-      randomTab3: 0,
       success: true,
       screenshots: [], // Array to store screenshot paths
       errors: [] // Array to store error details
@@ -108,7 +153,7 @@ class VizpadTestRunner {
       await browserManager.launch();
 
       // Step 0: Perform API login (faster than UI login)
-      console.log(`User ${userId}: Step 0 - Performing API login`);
+        console.log(`User ${userId}: Step 0 - Performing API login`);
         await this.testExecutionHelpers.performAPILogin(userId, testResults, browserManager, CONFIG);
 
       // Step 1: Open the Embed URL and wait for all charts to load
@@ -117,72 +162,54 @@ class VizpadTestRunner {
       );
       await this.testExecutionHelpers.performVizpadTest(userId, testResults, browserManager, CONFIG);
 
-      // Step 2: Apply Area filter and wait for all charts to load
-      // console.log(`User ${userId}: Step 2 - Applying Area filter`);
-      // await this.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime1');
+      // Step 2: Switch to tabs and apply filters randomly
+      const tabElements = await browserManager.page.$$(CONFIG.selectors.totalTabs);
+      CONFIG.availableTabs = tabElements.length;
+      console.log(`User ${userId}: Available tab count: ${tabElements.length}`);
+      if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
+        // Create array of available filters for random selection
+        const availableFilters = ['area', 'region', 'territory'];
+        let maxSwitchTabCount = Math.min(parseInt(CONFIG.tabCount), tabElements.length - 1);
+        
+        for (let i = 0; i < maxSwitchTabCount; i++) { 
+          console.log(`User ${userId}: Step ${i+2} - Switching to Tab ${i+2}`);
+          await this.testExecutionHelpers.performTabSwitch(
+            userId,
+            testResults,
+            browserManager,
+            i+2,
+            "tabSwitch" + (i+1),
+            CONFIG
+          );
 
-      // Step 3: Switch to a random tab and wait for all charts to load
-      // const availableTabs = [1, 2, 3, 4];
-      // const randomTab1 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      // testResults.randomTab1 = randomTab1;
-      // console.log(`User ${userId}: Step 3 - Switching to random Tab ${randomTab1}`);
-      for (let i = 0; i < 3; i++) { 
-        await this.testExecutionHelpers.performTabSwitch(
-          userId,
-          testResults,
-          browserManager,
-          i+2,
-          "tabSwitchTime" + (i+1),
-          CONFIG
-        );
+          // Apply random filter if filters are enabled
+          if (CONFIG.enableFilters && availableFilters.length > 0) {
+            const randomFilterIndex = Math.floor(Math.random() * availableFilters.length);
+            const selectedFilter = availableFilters[randomFilterIndex];
+            availableFilters.splice(randomFilterIndex, 1); // Remove to avoid duplicates
+            
+            console.log(`User ${userId}: Step ${i+2} - Applying ${selectedFilter} filter on Tab ${i+2}`);
+            
+            switch (selectedFilter) {
+              case 'area':
+                await this.testExecutionHelpers.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime1', CONFIG);
+                break;
+              case 'region':
+                await this.testExecutionHelpers.performRegionFilterTest(userId, testResults, browserManager, CONFIG);
+                break;
+              case 'territory':
+                await this.testExecutionHelpers.performTerritoryFilterTest(userId, testResults, browserManager, CONFIG);
+                break;
+            }
+          }
+        }
       }
-      // await this.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime2');
 
-      // Step 4: Switch to another random tab and wait for all charts to load
-      // let randomTab2 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      // // Ensure we don't select the same tab as the previous one
-      // while (randomTab2 === randomTab1) {
-      //   randomTab2 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      // }
-      // testResults.randomTab2 = randomTab2;
-      // console.log(`User ${userId}: Step 4 - Switching to random Tab ${randomTab2}`);
-      // await this.testExecutionHelpers.performTabSwitch(
-      //   userId,
-      //   testResults,
-      //   browserManager,
-      //   3,
-      //   "tabSwitchTime2",
-      //   CONFIG
-      // );
-
-      // Step 5: Apply Region filter and wait for all charts to load
-      // console.log(`User ${userId}: Step 5 - Applying Region filter`);
-      // await this.performRegionFilterTest(userId, testResults, browserManager);
-
-      // // Step 6: Apply Territory filter and wait for all charts to load
-      // console.log(`User ${userId}: Step 6 - Applying Territory filter`);
-      // await this.performTerritoryFilterTest(userId, testResults, browserManager);
-
-      // Step 7: Switch to yet another random tab and wait for all charts to load
-      // let randomTab3 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      // // Ensure we don't select the same tab as the previous ones
-      // while (randomTab3 === randomTab1 || randomTab3 === randomTab2) {
-      //   randomTab3 = availableTabs[Math.floor(Math.random() * availableTabs.length)];
-      // }
-      // testResults.randomTab3 = randomTab3;
-      // console.log(`User ${userId}: Step 7 - Switching to random Tab ${randomTab3}`);
-      // await this.testExecutionHelpers.performTabSwitch(
-      //   userId,
-      //   testResults,
-      //   browserManager,
-      //   4,
-      //   "tabSwitchTime3",
-      //   CONFIG
-      // );
-
-      // Step 5: Apply Area filter and wait for all charts to load
-      // console.log(`User ${userId}: Step 5 - Applying Area filter`);
-      // await this.performAreaFilterTest(userId, testResults, browserManager, 'areaFilterTime3');
+      // Step 3: Apply Time filter if enabled (separate from other filters)
+      if (CONFIG.enableTimeFilter) {
+        console.log(`User ${userId}: Step ${CONFIG.tabCount + 2} - Applying Time filter`);
+        await this.testExecutionHelpers.performTimeFilterTest(userId, testResults, browserManager, CONFIG);
+      }
       
       // Take a final screenshot to verify screenshot functionality
       console.log(`User ${userId}: Taking final test completion screenshot`);
@@ -238,9 +265,19 @@ class VizpadTestRunner {
   }
 
   async runAllTests() {
-    const numUsers = parseInt(process.argv[3]) || 1;
+    const numUsers = CONFIG.users;
 
     console.log(`Starting vizpad performance test with ${numUsers} users`);
+    console.log(`Configuration:`);
+    console.log(`- Users: ${CONFIG.users}`);
+    console.log(`- Tab Count: ${CONFIG.tabCount}`);
+    console.log(`- Username: ${CONFIG.username}`);
+    console.log(`- Login URL: ${CONFIG.loginUrl}`);
+    console.log(`- Vizpad URL: ${CONFIG.vizpadUrl}`);
+    console.log(`- Enable Filters: ${CONFIG.enableFilters}`);
+    console.log(`- Enable Time Filter: ${CONFIG.enableTimeFilter}`);
+    console.log(`- Enable Email: ${CONFIG.enableEmail}`);
+    console.log(`- Tab Switch: ${CONFIG.tabSwitch}`);
     console.log(`Vizpad URL: ${CONFIG.vizpadUrl}`);
 
     // Global crash handler for unexpected errors

@@ -7,8 +7,8 @@ metadata:
 spec:
   # parallelism is the number of jobs to run concurrently
   # completions is the number of jobs to run to completion
-  parallelism: 27
-  completions: 27
+  parallelism: 1
+  completions: 1
   template:
     metadata:
       labels:
@@ -20,7 +20,7 @@ spec:
       containers:
         - name: vizpad
           # image is the image to run the job, please update the image tag to the latest version
-          image: 956938892320.dkr.ecr.us-east-1.amazonaws.com/qa-automation:performance-v0.16
+          image: 956938892320.dkr.ecr.us-east-1.amazonaws.com/qa-automation:performance-v1.01
           # The command is updated to pass the '--users=2' argument to the 'vizpad' npm script.
           # The '--' is used to separate arguments for npm from arguments for your script.
           command: ["npm", "run", "vizpad", "--", "--users=3"]
