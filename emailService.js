@@ -167,7 +167,7 @@ class EmailService {
                 <td class="metric-value">${averages.timeFilter || 'N/A'}</td>
             </tr>
             ` : ''}
-            ${CONFIG && CONFIG.tabCount > 0 ? Array.from({length: CONFIG.tabCount}, (_, i) => `
+            ${CONFIG && Math.min(CONFIG.tabCount, CONFIG.availableTabs - 1) > 0 ? Array.from({length: Math.min(CONFIG.tabCount, CONFIG.availableTabs - 1)}, (_, i) => `
             <tr>
                 <td>Tab Switch ${i + 1}</td>
                 <td class="metric-value">${averages[`tabSwitch${i + 1}`] || 'N/A'}</td>
@@ -189,7 +189,7 @@ class EmailService {
                 ${CONFIG && CONFIG.enableFilters ? '<th>Region Filter (s)</th>' : ''}
                 ${CONFIG && CONFIG.enableFilters ? '<th>Territory Filter (s)</th>' : ''}
                 ${CONFIG && CONFIG.enableTimeFilter ? '<th>Time Filter (s)</th>' : ''}
-                ${CONFIG && CONFIG.tabCount > 0 ? Array.from({length: CONFIG.tabCount}, (_, i) => `<th>Tab Switch ${i + 1} (s)</th>`).join('') : ''}
+                ${CONFIG && Math.min(CONFIG.tabCount, CONFIG.availableTabs - 1) > 0 ? Array.from({length: Math.min(CONFIG.tabCount, CONFIG.availableTabs - 1)}, (_, i) => `<th>Tab Switch ${i + 1} (s)</th>`).join('') : ''}
                 <th>Status</th>
             </tr>
             ${results.map(result => `
@@ -202,7 +202,7 @@ class EmailService {
                 ${CONFIG && CONFIG.enableFilters ? `<td>${result.regionFilterTime ? result.regionFilterTime.toFixed(2) : 'N/A'}</td>` : ''}
                 ${CONFIG && CONFIG.enableFilters ? `<td>${result.territoryFilterTime ? result.territoryFilterTime.toFixed(2) : 'N/A'}</td>` : ''}
                 ${CONFIG && CONFIG.enableTimeFilter ? `<td>${result.timeFilterTime ? result.timeFilterTime.toFixed(2) : 'N/A'}</td>` : ''}
-                ${CONFIG && CONFIG.tabCount > 0 ? Array.from({length: CONFIG.tabCount}, (_, i) => `<td>${result[`tabSwitch${i + 1}`] ? result[`tabSwitch${i + 1}`].toFixed(2) : 'N/A'}</td>`).join('') : ''}
+                ${CONFIG && Math.min(CONFIG.tabCount, CONFIG.availableTabs - 1) > 0 ? Array.from({length: Math.min(CONFIG.tabCount, CONFIG.availableTabs - 1)}, (_, i) => `<td>${result[`tabSwitch${i + 1}`] ? result[`tabSwitch${i + 1}`].toFixed(2) : 'N/A'}</td>`).join('') : ''}
                 <td class="${result.success ? 'success' : 'failed'}">${result.success ? '✅ Success' : '❌ Failed'}</td>
             </tr>
             `).join('')}
