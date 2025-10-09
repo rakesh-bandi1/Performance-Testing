@@ -10,6 +10,7 @@
     "vizpad": "node run_vizpad_test.js --",
     "vizpad:direct": "node vizpadTest.js",
     "vizpad:api": "node vizpadTest.js -- -- -- -- -- -- -- -- true",
+    "vizpad:config": "node vizpadTest.js",
     "email:test": "node testEmail.js",
     "screenshot:test": "node test_screenshot_functionality.js",
     "email:setup": "echo 'Please configure email settings in emailConfig.js or set environment variables'"
