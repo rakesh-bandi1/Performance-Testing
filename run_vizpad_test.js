@@ -20,11 +20,12 @@ async function runInteractiveVizpadTest() {
     
     // 1. Ask for complete vizpad URL
     // const vizUrl = await askQuestion('Enter the complete vizpad URL: ');
-    const url = 'https://galaxyai.bayer.com/dashboard/72ed4cae-f8c3-4d20-a8d3-897355f56d36/875c7d53-6502-4b78-a1e7-588104950912?utm_source=90755d77-0481-45bd-88b6-6a508e3f1331';
+    const url = 'https://galaxyai-dev.bayer.com/dashboard/60f7edee-af68-4b81-9721-cba9166fab26/a23139b8-e035-4c2f-b38c-548636d33bc6';
     
-    // 2. Ask for number of users
-    const numUsers = await askQuestion('How many users do you want to test? (default: 1): ');
-    const users = numUsers.trim() === '' ? '1' : numUsers.trim();
+    // 2. Get number of users from command line argument or default to 1
+    // Usage: npm run run_vizpad_test --users=5
+    const usersArg = process.argv.find(arg => arg.startsWith('--users='));
+    const users = usersArg ? usersArg.split('=')[1] : '1';
     
     // 3. Ask for tab index
     // const isTabSwitch = await askQuestion('Enter the tab switch (default: false): ');
@@ -32,7 +33,7 @@ async function runInteractiveVizpadTest() {
     
     // 4. Ask for email configuration
     // const enableEmail = await askQuestion('Send results via email? (y/n, default: n): ');
-    const enableEmail = 'n';
+    const enableEmail = 'y';
     const emailEnabled = enableEmail.trim().toLowerCase() === 'y' || enableEmail.trim().toLowerCase() === 'yes';
     
     console.log(`\nRunning vizpad test with:`);
