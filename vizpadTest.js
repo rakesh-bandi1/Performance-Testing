@@ -58,6 +58,7 @@ const commandLineConfig = parseCommandLineArgs();
 const CONFIG = {
   users: commandLineConfig.users,
   tabCount: commandLineConfig.tabCount,
+  availableTabs: 0,
   username: commandLineConfig.username,
   password: commandLineConfig.password,
   loginUrl: commandLineConfig.loginUrl,
@@ -96,6 +97,7 @@ const CONFIG = {
     applyBtn: "[data-cy-id='cy-popup-aply']",
     tab: "cy-tb",
     appLoader: "#appLoader",
+    totalTabs: "[data-cy-id^='cy-tb']",
     territoryEle: `//input[@data-cy-id='cy-viz-title' and @value='Territory']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
     regionEle: `//input[@data-cy-id='cy-viz-title' and @value='Region']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
     areaEle: `//input[@data-cy-id='cy-viz-title' and @value='Area']/ancestor::div[contains(@class,'viz-control-chart')]//div[@data-cy-id='cy-search-data']`,
@@ -161,11 +163,15 @@ class VizpadTestRunner {
       await this.testExecutionHelpers.performVizpadTest(userId, testResults, browserManager, CONFIG);
 
       // Step 2: Switch to tabs and apply filters randomly
-      if (CONFIG.tabCount > 0) {
+      const tabElements = await browserManager.page.$$(CONFIG.selectors.totalTabs);
+      CONFIG.availableTabs = tabElements.length;
+      console.log(`User ${userId}: Available tab count: ${tabElements.length}`);
+      if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
         // Create array of available filters for random selection
         const availableFilters = ['area', 'region', 'territory'];
+        let maxSwitchTabCount = Math.min(parseInt(CONFIG.tabCount), tabElements.length - 1);
         
-        for (let i = 0; i < parseInt(CONFIG.tabCount); i++) { 
+        for (let i = 0; i < maxSwitchTabCount; i++) { 
           console.log(`User ${userId}: Step ${i+2} - Switching to Tab ${i+2}`);
           await this.testExecutionHelpers.performTabSwitch(
             userId,

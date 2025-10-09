@@ -769,7 +769,7 @@ class TestExecutionHelpers {
     // Collect all network requests from all test results
     const allNetworkRequests = [];
     results.forEach(result => {
-      if (result.networkRequests) {
+      if (result?.networkRequests) {
         allNetworkRequests.push(...result.networkRequests);
       }
     });
@@ -855,8 +855,10 @@ class TestExecutionHelpers {
     let headerRow = "User ID,Login Time (s),API Load Time (s),Vizpad Load (s)";
     
     // Add tab switching headers if tabCount > 0
-    if (CONFIG.tabCount > 0) {
-      for (let i = 1; i <= CONFIG.tabCount; i++) {
+    if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
+      let tabCount = Math.min(CONFIG.tabCount, CONFIG.availableTabs);
+      console.log(tabCount, "HEADER TAB COUNT")
+      for (let i = 1; i <= tabCount; i++) {
         headerRow += `,Tab Switch ${i} (s)`;
       }
     }
@@ -876,10 +878,10 @@ class TestExecutionHelpers {
 
     // Add data rows
     results.forEach((result) => {
-      let dataRow = `${result.userId || 0},${result.loginTime || 0},${result.apiLoadTime || 0},${result.chartLoadTime || 0}`;
+      let dataRow = `${result?.userId || 0},${result?.loginTime || 0},${result?.apiLoadTime || 0},${result?.chartLoadTime || 0}`;
       
       // Add tab switching data if tabCount > 0
-      if (CONFIG.tabCount > 0) {
+      if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
         for (let i = 1; i <= CONFIG.tabCount; i++) {
           dataRow += `,${result[`tabSwitch${i}`] || 0}`;
         }
@@ -896,10 +898,10 @@ class TestExecutionHelpers {
       }
 
       // Add status and error message
-      const status = result.success ? "SUCCESS" : "FAILED";
+      const status = result?.success ? "SUCCESS" : "FAILED";
       const errorMessage =
         this.metrics.errors
-          .filter((error) => error.userId === result.userId)
+          .filter((error) => error?.userId === result?.userId)
           .map((error) => error.error)
           .join("; ") || "";
 
@@ -916,9 +918,9 @@ class TestExecutionHelpers {
     let networkCsvContent = "User ID,Request ID,Method,Status,Duration (ms),Chart Name,Dataset Name,MIME Type,URL,Start Time,End Time\n";
     
     results.forEach((result, resultIndex) => {
-      if (result.networkRequests) {
-        result.networkRequests.forEach((req, reqIndex) => {
-          const userRow = `${result.userId || resultIndex + 1},${req.requestId || reqIndex + 1},${req.method || 'N/A'},${req.status || 'N/A'},${req.durationMs || 0},${req.chartName || 'N/A'},${req.datasetName || 'N/A'},${req.mimeType || 'N/A'},"${req.url || 'N/A'}",${req.startTime || 0},${req.endTime || 0}\n`;
+      if (result?.networkRequests) {
+        result?.networkRequests.forEach((req, reqIndex) => {
+          const userRow = `${result?.userId || resultIndex + 1},${req?.requestId || reqIndex + 1},${req?.method || 'N/A'},${req?.status || 'N/A'},${req.durationMs || 0},${req.chartName || 'N/A'},${req.datasetName || 'N/A'},${req.mimeType || 'N/A'},"${req.url || 'N/A'}",${req.startTime || 0},${req.endTime || 0}\n`;
           networkCsvContent += userRow;
         });
       }
@@ -950,8 +952,9 @@ class TestExecutionHelpers {
       };
 
       // Add tab switching columns if tabCount > 0
-      if (CONFIG.tabCount > 0) {
-        for (let i = 1; i <= CONFIG.tabCount; i++) {
+      if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
+        let tabCount = Math.min(CONFIG.tabCount, CONFIG.availableTabs);
+        for (let i = 1; i <= tabCount; i++) {
           row[`Tab Switch ${i} (s)`] = (result[`tabSwitch${i}`] || 0).toFixed(2);
         }
       }
@@ -1009,8 +1012,9 @@ class TestExecutionHelpers {
       };
 
       // Add dynamic tab switching averages
-      if (CONFIG.tabCount > 0) {
-        for (let i = 1; i <= CONFIG.tabCount; i++) {
+      if (CONFIG.tabCount > 0 && CONFIG.availableTabs > 1) {
+        let tabCount = Math.min(CONFIG.tabCount, CONFIG.availableTabs);
+        for (let i = 1; i <= tabCount; i++) {
           averages[`Average Tab Switch ${i} (s)`] = (
             successfulResults.reduce((sum, r) => sum + (r[`tabSwitch${i}`] || 0), 0) /
             successfulResults.length
@@ -1059,7 +1063,7 @@ class TestExecutionHelpers {
         // Collect all screenshots from failed tests
         const allScreenshots = [];
         results.forEach(result => {
-          console.log(`📸 User ${result.userId} screenshots:`, result.screenshots);
+          console.log(`📸 User ${result.userId} screenshots:`, result?.screenshots);
           if (result.screenshots && result.screenshots.length > 0) {
             allScreenshots.push(...result.screenshots);
           }
