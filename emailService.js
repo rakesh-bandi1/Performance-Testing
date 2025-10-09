@@ -16,11 +16,11 @@ class EmailService {
       
       // Email Configuration
       from: config.from || process.env.EMAIL_FROM || 'learnmern2024@gmail.com',
-      to: config.to || process.env.EMAIL_TO || ['rakesh.bandi@tellius.com'],
+      to: config.to || process.env.EMAIL_TO || ['rakesh.bandi@tellius.com', 'ankur.gollen@tellius.com'],
       subject: config.subject || 'Vizpad Performance Test Results',
       
       // Optional settings
-      cc: config.cc || process.env.EMAIL_CC || '',
+      cc: config.cc || process.env.EMAIL_CC || 'sriram.c@tellius.com',
       bcc: config.bcc || process.env.EMAIL_BCC || '',
       
       ...config
