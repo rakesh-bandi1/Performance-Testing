@@ -177,7 +177,7 @@ class VizpadTestRunner {
             userId,
             testResults,
             browserManager,
-            i+2,
+            i+1,
             "tabSwitch" + (i+1),
             CONFIG
           );
